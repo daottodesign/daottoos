@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DaottoOS | Diseño Inteligente</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <style>
+        @supports (font: -apple-system-body) {
+            body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, sans-serif; }
+        }
+        body { background-color: #000000; color: #f5f5f7; -webkit-font-smoothing: antialiased; padding-bottom: env(safe-area-inset-bottom); overflow-x: hidden;}
+        
+        .glass-panel { 
+            background: rgba(28, 28, 30, 0.7); 
+            backdrop-filter: blur(20px) saturate(180%); 
+            -webkit-backdrop-filter: blur(20px) saturate(180%); 
+            border: 1px solid rgba(255, 255, 255, 0.08); 
+        }
+        
+        .dark-card { background: rgba(20, 20, 22, 0.8); border: 1px solid rgba(255, 255, 255, 0.05); }
+        
+        .floating-dock { box-shadow: 0 20px 40px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.05); }
+        .project-card { transition: transform 0.2s ease, border-color 0.2s ease; }
+        
+        .checkbox-custom { appearance: none; width: 22px; height: 22px; border: 1.5px solid #48484a; border-radius: 11px; display: grid; place-content: center; transition: all 0.2s; cursor: pointer; flex-shrink: 0;}
+        .checkbox-custom::before { content: ""; width: 12px; height: 12px; background-color: #fff; transform: scale(0); transition: 150ms transform cubic-bezier(0.4, 0, 0.2, 1); border-radius: 6px;}
+        .checkbox-custom:checked { border-color: #34c759; background-color: #34c759; }
+        .checkbox-custom:checked::before { transform: scale(1); }
+        .task-row:has(input:checked) span.task-label { text-decoration: line-through; color: #8e8e93; }
+        
+        .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.5s cubic-bezier(0,1,0,1); }
+        .accordion-content.open { max-height: 2000px; transition: max-height 0.6s ease-in; }
+        .chevron { transition: transform 0.3s ease; }
+        .chevron.open { transform: rotate(180deg); }
+        
+        ::-webkit-scrollbar { display: none; } 
+    </style>
+</head>
+<body class="min-h-screen flex flex-col pb-32 sm:pb-36 selection:bg-emerald-500/30">
+
+    <!-- Header -->
+    <div class="w-full flex justify-center sticky top-0 z-40 bg-black/60 backdrop-blur-xl border-b border-white/5">
+        <header class="w-full max-w-7xl px-4 sm:px-6 py-3.5 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-gray-800 to-black border border-gray-700 flex items-center justify-center shadow-inner shrink-0">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#34c759" stroke-width="2.5" stroke-linejoin="round"/>
+                        <path d="M2 17L12 22L22 17" stroke="white" stroke-width="2.5" stroke-linejoin="round"/>
+                        <path d="M2 12L12 17L22 12" stroke="white" stroke-width="2.5" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="min-w-0">
+                    <h1 class="text-[15px] font-bold tracking-tight text-white truncate">Daotto<span class="text-gray-400 font-normal">OS</span></h1>
+                    <p class="text-[10px] text-emerald-400 font-medium uppercase tracking-widest" id="sync-status">Conectando...</p>
+                </div>
+            </div>
+            <button onclick="toggleAIChat()" class="px-4 py-2 rounded-full bg-gray-900 text-emerald-400 border border-gray-700 text-[12px] font-semibold flex items-center gap-2 hover:bg-gray-800 transition shrink-0 shadow-md">
+                <i data-lucide="sparkles" class="w-4 h-4"></i> Inbox Gemini
+            </button>
+        </header>
+    </div>
+
+    <!-- Contenedor Principal -->
+    <div class="w-full max-w-7xl mx-auto flex-1 flex flex-col w-full mt-2">
+        
+        <!-- Barra Semanal Interactiva -->
+        <div class="px-4 sm:px-6 py-6 w-full max-w-3xl mx-auto">
+            <div class="mb-5 text-center sm:text-left">
+                <h2 class="text-[32px] font-extrabold tracking-tighter text-white leading-none">Panel de Control</h2>
+                <p class="text-[14px] text-gray-400 font-medium mt-1" id="current-date">Cargando fecha...</p>
+            </div>
+            <div class="grid grid-cols-7 gap-2 sm:gap-3" id="weekly-load-bar"></div>
+        </div>
+
+        <div class="flex flex-col lg:flex-row gap-6 px-4 sm:px-6 w-full">
+            
+            <!-- Columna Izquierda: Captura y Recordatorios -->
+            <div class="w-full lg:w-[320px] flex flex-col gap-6 shrink-0 lg:sticky lg:top-24 lg:h-[calc(100vh-100px)]">
+                
+                <!-- Captura Rápida con Voz -->
+                <section class="w-full">
+                    <div class="glass-panel p-5 rounded-3xl w-full shadow-xl">
+                        <h3 class="text-[12px] font-bold uppercase tracking-wider text-gray-300 mb-4 flex items-center gap-2">
+                            <i data-lucide="zap" class="w-4 h-4 text-emerald-500"></i> Captura Rápida
+                        </h3>
+                        <div class="flex flex-col gap-3 w-full">
+                            <div class="relative w-full">
+                                <input type="text" id="quick-note-input" placeholder="Ej: Nueva v2 Veli Vita..." onkeydown="if(event.key==='Enter') processSmartNote()" class="w-full bg-gray-900/70 border border-gray-700 rounded-2xl pl-5 pr-12 py-3.5 text-[14px] text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition shadow-inner">
+                                <button onclick="startDictation('quick-note-input')" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-500 transition p-1">
+                                    <i data-lucide="mic" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                            <button onclick="processSmartNote()" class="w-full bg-white text-black px-5 py-3.5 rounded-2xl font-bold text-[14px] hover:bg-gray-200 transition shadow-lg active:scale-[0.99]">
+                                Guardar Anotación
+                            </button>
+                        </div>
+                        <div id="quick-notes-list" class="space-y-2.5 mt-4 max-h-36 overflow-y-auto pr-1 text-[13px] text-gray-300"></div>
+                    </div>
+                </section>
+
+                <!-- Próximos Recordatorios -->
+                <section class="w-full">
+                    <div class="glass-panel p-5 rounded-3xl w-full shadow-xl">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-[12px] font-bold uppercase tracking-wider text-gray-300">Recordatorios</h3>
+                            <span class="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1 rounded-full" id="reminders-count">0</span>
+                        </div>
+                        <div id="reminders-list" class="space-y-3 max-h-56 overflow-y-auto pr-1"></div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Columna Derecha: Grilla de Proyectos -->
+            <div class="w-full flex flex-col">
+                <div class="mb-6 sticky top-24 z-30">
+                    <div class="flex items-center gap-3 w-full glass-panel p-2 rounded-2xl shadow-lg border-gray-700/50">
+                        <div class="flex bg-gray-900 p-1.5 rounded-xl flex-1 overflow-x-auto shadow-inner border border-gray-700/50">
+                            <button onclick="setFilter('all')" id="filter-all" class="flex-1 min-w-[70px] px-4 py-2.5 rounded-lg text-[13px] font-semibold bg-gray-700 text-white shadow transition whitespace-nowrap">Todos</button>
+                            <button onclick="setFilter('enfoque')" id="filter-enfoque" class="flex-1 min-w-[80px] px-4 py-2.5 rounded-lg text-[13px] font-semibold text-gray-400 hover:text-white transition whitespace-nowrap">Enfoque</button>
+                            <button onclick="setFilter('cola')" id="filter-cola" class="flex-1 min-w-[70px] px-4 py-2.5 rounded-lg text-[13px] font-semibold text-gray-400 hover:text-white transition whitespace-nowrap">En Cola</button>
+                        </div>
+                        <button onclick="createNewProject()" class="p-3.5 bg-emerald-500 text-black rounded-xl flex-shrink-0 hover:bg-emerald-400 transition shadow-lg active:scale-[0.98]">
+                            <i data-lucide="plus" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <main class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 w-full pb-10" id="projects-container"></main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dock Flotante Inferior -->
+    <div class="fixed bottom-6 sm:bottom-8 w-full flex justify-center z-50 px-4 pointer-events-none">
+        <nav class="glass-panel floating-dock rounded-full px-8 py-4 flex gap-10 items-center w-full max-w-xs justify-center pointer-events-auto shadow-2xl border border-white/10">
+            <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="flex flex-col items-center gap-1.5 text-white hover:scale-110 transition-transform">
+                <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                <span class="text-[10px] font-medium">Inicio</span>
+            </button>
+            <button onclick="openSyncModal()" class="relative flex items-center justify-center -mt-12 hover:scale-110 transition-transform">
+                <div class="bg-gradient-to-b from-white to-gray-300 text-black p-5 rounded-full shadow-2xl border-b-4 border-gray-400">
+                    <i data-lucide="scan" class="w-8 h-8 stroke-[1.5]"></i>
+                </div>
+            </button>
+            <button onclick="openContextModal()" class="flex flex-col items-center gap-1.5 text-gray-400 hover:text-white hover:scale-110 transition-transform">
+                <i data-lucide="folder-open" class="w-6 h-6"></i>
+                <span class="text-[10px] font-medium">Briefs</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Modal Drawer Gemini -->
+    <div id="ai-chat-drawer" class="hidden fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex flex-col justify-end transition-opacity p-2 sm:p-0">
+        <div class="glass-panel w-full max-w-lg mx-auto rounded-t-[32px] p-6 border-t-2 border-emerald-500/20 flex flex-col h-[85vh] shadow-2xl mb-2 sm:mb-0">
+            <div class="w-14 h-1.5 bg-gray-600 rounded-full mx-auto mb-6"></div>
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-[20px] font-bold text-white flex items-center gap-3">
+                    <i data-lucide="sparkles" class="w-6 h-6 text-emerald-500"></i> Inbox Inteligente Gemini
+                </h3>
+                <button onclick="toggleAIChat()" class="w-9 h-9 bg-gray-800 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition shadow-inner"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="chat-messages" class="flex-1 overflow-y-auto space-y-5 text-[14px] pb-4 pr-1">
+                <div class="bg-gray-800 p-4 rounded-2xl rounded-tl-sm text-gray-200 border border-gray-700 w-[90%] shadow-md">Hola Frank. Estoy listo. Háblame de tus ideas de vuelo o instrucciones para clientes y yo las organizaré en el tablero.</div>
+            </div>
+            <div class="pt-5 mt-2 border-t border-gray-800 flex gap-3 w-full">
+                <div class="relative flex-1">
+                    <input type="text" id="chat-input" placeholder="Escribe o dicta tu idea..." onkeydown="if(event.key==='Enter') sendChatMessage()" class="w-full bg-gray-900 border border-gray-700 rounded-full pl-5 pr-12 py-4 text-[14px] text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition shadow-inner">
+                    <button onclick="startDictation('chat-input')" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-500 transition p-1">
+                        <i data-lucide="mic" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <button onclick="sendChatMessage()" class="bg-emerald-500 text-black w-14 h-14 rounded-full flex items-center justify-center shrink-0 hover:bg-emerald-400 active:scale-[0.98] transition shadow-lg">
+                    <i data-lucide="arrow-up" class="w-6 h-6"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-sync" class="hidden fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-center justify-center px-4 p-2">
+        <div class="glass-panel p-8 rounded-[32px] w-full max-w-sm text-center shadow-2xl border border-white/10">
+            <div class="w-16 h-16 bg-gray-800 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner border border-gray-700">
+                <i data-lucide="scan" class="w-9 h-9 text-white stroke-[1.5]"></i>
+            </div>
+            <h3 class="text-[22px] font-bold mb-2 text-white">Sincronización Visual</h3>
+            <p class="text-[14px] text-gray-300 mb-8 leading-relaxed">
+                Toma la foto de tu libreta y súbela al <strong>Inbox de Gemini</strong> (botón superior). Gemini analizará tus trazos y actualizará el tablero automáticamente.
+            </p>
+            <button onclick="closeModal('modal-sync')" class="w-full bg-white text-black font-bold py-4 rounded-2xl text-[16px] active:scale-[0.98] shadow-lg">Entendido</button>
+        </div>
+    </div>
+
+    <div id="modal-context" class="hidden fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex flex-col justify-end p-2 sm:p-0">
+        <div class="glass-panel w-full max-w-lg mx-auto rounded-t-[32px] p-6 flex flex-col max-h-[85vh] shadow-2xl border border-white/10 mb-2 sm:mb-0">
+            <div class="w-14 h-1.5 bg-gray-600 rounded-full mx-auto mb-6"></div>
+            <h3 class="text-[20px] font-bold text-white mb-5">Briefs y Contexto de Clientes</h3>
+            <div class="space-y-4 overflow-y-auto flex-1 pr-1" id="briefs-list"></div>
+            <button onclick="closeModal('modal-context')" class="w-full bg-gray-800 text-white mt-6 font-semibold py-4 rounded-2xl text-[16px]">Cerrar</button>
+        </div>
+    </div>
+
+    <script>
+        const dateOpts = { weekday: 'long', day: 'numeric', month: 'long' };
+        document.getElementById('current-date').innerText = new Date().toLocaleDateString('es-ES', dateOpts).replace(/^\w/, c => c.toUpperCase());
+        lucide.createIcons();
+        
+        let currentFilter = 'all';
+
+        // Configuración Firebase Realtime Database
+        const firebaseConfig = { 
+            databaseURL: "https://daotto-327c2-default-rtdb.firebaseio.com/"
+        };
+        
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+        document.getElementById('sync-status').innerText = "ONLINE (CLOUD)";
+
+        // Datos iniciales precargados con tus proyectos actuales
+        let appData = {
+            projects: [
+                { id: 'p1', name: 'Veli Vita', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Branding integral, moodboard, propuesta gráfica y cotización.', tasks: [{ id: 't1_1', text: 'Armar Moodboard y propuesta', done: false }] },
+                { id: 'p2', name: 'Peluzzia', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Identidad cercana, carruseles educativos y Grilla Dos.', tasks: [{ id: 't2_1', text: 'Finalizar Grilla Dos', done: false }] },
+                { id: 'p3', name: 'Señor Emiro', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Logotipo clásico, tipografía y guía de estilo.', tasks: [{ id: 't3_1', text: 'Montar fotografía en logo', done: false }] },
+                { id: 'p4', name: 'Ciudad Café', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Gestión de cartas, promociones y material P.O.P.', tasks: [{ id: 't4_1', text: 'Terminar diseños de promos y cartas', done: false }] },
+                { id: 'p5', name: 'FastWay', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Edición logística y de Reels.', tasks: [{ id: 't5_1', text: 'Edición de Reels', done: false }] },
+                { id: 'p6', name: 'Natoura', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Diseño comercial de valla, fachada y ads.', tasks: [{ id: 't6_1', text: 'Diseño de fachada', done: false }] },
+                { id: 'p7', name: 'Labomed', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Tríptico, pendón y lanyard.', tasks: [{ id: 't7_1', text: 'Adelantar lanyard', done: false }] },
+                { id: 'p8', name: 'Puyaos', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Diseño de etiqueta de café.', tasks: [{ id: 't8_1', text: 'Finalizar etiqueta de café', done: false }] },
+                { id: 'p9', name: 'Cafetero VE', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Doypack, empaque y planimetría.', tasks: [{ id: 't9_1', text: 'Revisión de empaque con cliente', done: false }] }
+            ],
+            quickNotes: [], reminders: [], chatLogs: []
+        };
+
+        function loadData() {
+            db.ref('daotto_data_v6').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    appData = { ...appData, ...data };
+                    appData.projects = appData.projects || [];
+                    appData.quickNotes = appData.quickNotes || [];
+                    appData.reminders = appData.reminders || [];
+                    appData.chatLogs = appData.chatLogs || [];
+                    updateUI();
+                } else {
+                    saveData();
+                }
+            });
+        }
+
+        function saveData() {
+            db.ref('daotto_data_v6').set(appData);
+        }
+
+        function startDictation(inputId) {
+            if (window.hasOwnProperty('webkitSpeechRecognition') || window.hasOwnProperty('SpeechRecognition')) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                const recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = "es-ES";
+                
+                const inputEl = document.getElementById(inputId);
+                const originalPlaceholder = inputEl.placeholder;
+                inputEl.placeholder = "Escuchando voz...";
+                
+                recognition.start();
+                
+                recognition.onresult = function(e) {
+                    inputEl.value += (inputEl.value ? " " : "") + e.results[0][0].transcript;
+                    inputEl.placeholder = originalPlaceholder;
+                    recognition.stop();
+                };
+                recognition.onerror = function() {
+                    inputEl.placeholder = originalPlaceholder;
+                    recognition.stop();
+                }
+            } else {
+                alert("Tu navegador no soporta dictado por voz. Usa Chrome o Safari.");
+            }
+        }
+
+        function filterByDay(dayName) {
+            const pendingForDay = appData.reminders.filter(r => r.date && r.date.toLowerCase().includes(dayName.toLowerCase()));
+            if(pendingForDay.length > 0) {
+                alert(`Recordatorios para el ${dayName}:\n\n` + pendingForDay.map(r => `- ${r.text}`).join('\n'));
+            } else {
+                alert(`No hay recordatorios agendados específicos para el ${dayName}.`);
+            }
+        }
+
+        function processSmartNote() {
+            const input = document.getElementById('quick-note-input');
+            const val = input.value.trim();
+            if(!val) return;
+
+            appData.quickNotes.unshift(val);
+            const valLower = val.toLowerCase();
+
+            let matchedProj = appData.projects.find(p => valLower.includes(p.name.toLowerCase()));
+            if (matchedProj) {
+                matchedProj.tasks = matchedProj.tasks || [];
+                matchedProj.tasks.push({ id: 't_' + Date.now(), text: val, done: false });
+                appData.reminders.unshift({ text: `Seguimiento: ${matchedProj.name} - ${val}`, date: 'Hoy', priority: 'Alta' });
+            } else {
+                appData.reminders.unshift({ text: val, date: 'Revisar', priority: 'Media' });
+            }
+
+            input.value = ''; 
+            saveData();
+        }
+
+        function updateUI() {
+            renderWeeklyLoad();
+            renderReminders();
+            renderProjects();
+            renderQuickNotes();
+            renderBriefs();
+            renderChatLogs();
+            lucide.createIcons();
+        }
+
+        function renderWeeklyLoad() {
+            const days = [{d:'LUN', full:'Lunes'}, {d:'MAR', full:'Martes'}, {d:'MIÉ', full:'Miércoles'}, {d:'JUE', full:'Jueves'}, {d:'VIE', full:'Viernes'}, {d:'SÁB', full:'Sábado'}, {d:'DOM', full:'Domingo'}];
+            const container = document.getElementById('weekly-load-bar');
+            const todayIndex = (new Date().getDay() + 6) % 7; 
+            
+            container.innerHTML = days.map((day, idx) => {
+                const isToday = idx === todayIndex;
+                const loadHeight = idx <= 4 ? (isToday ? 'h-12' : 'h-10') : 'h-4'; 
+                const loadColor = idx <= 4 ? 'bg-emerald-500' : 'bg-gray-600';
+                
+                return `
+                    <div onclick="filterByDay('${day.full}')" class="cursor-pointer flex flex-col items-center justify-end p-2.5 rounded-2xl transition ${isToday ? 'bg-gray-900 border border-gray-700' : 'hover:bg-gray-800'}">
+                        <div class="w-full ${loadHeight} ${loadColor} rounded-md mb-2 transition-all duration-500"></div>
+                        <span class="text-[10px] font-bold ${isToday ? 'text-white' : 'text-gray-500'}">${day.d}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderReminders() {
+            const list = document.getElementById('reminders-list');
+            document.getElementById('reminders-count').innerText = appData.reminders.length;
+            
+            if (appData.reminders.length === 0) {
+                list.innerHTML = `<p class="text-[13px] text-gray-500 text-center py-4">No hay recordatorios.</p>`;
+                return;
+            }
+
+            list.innerHTML = appData.reminders.map((rem, idx) => `
+                <div class="flex items-center justify-between dark-card px-4 py-3.5 rounded-2xl border border-gray-700/50 shadow-inner">
+                    <div class="flex items-center gap-3 flex-1 min-w-0 pr-2">
+                        <span class="w-2.5 h-2.5 rounded-full shrink-0 ${rem.priority === 'Alta' ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}"></span>
+                        <span class="text-white text-[13px] font-medium truncate">${rem.text}</span>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="text-[11px] text-gray-400 font-mono bg-gray-900 px-2 py-1 rounded-md">${rem.date || ''}</span>
+                        <button onclick="deleteReminder(${idx})" class="text-gray-500 hover:text-white p-1"><i data-lucide="x-circle" class="w-4 h-4"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderProjects() {
+            const container = document.getElementById('projects-container');
+            container.innerHTML = '';
+            
+            const filtered = appData.projects.filter(p => currentFilter === 'all' || p.category === currentFilter);
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="sm:col-span-2 xl:col-span-3 text-center py-20 glass-panel rounded-3xl"><i data-lucide="clipboard-list" class="w-12 h-12 text-gray-600 mx-auto mb-4"></i><p class="text-gray-500 text-[14px]">No hay proyectos en esta categoría.</p></div>`;
+                return;
+            }
+
+            filtered.forEach((proj) => {
+                const projTotal = proj.tasks ? proj.tasks.length : 0;
+                const projDone = proj.tasks ? proj.tasks.filter(t => t.done).length : 0;
+                const progressPct = projTotal === 0 ? 0 : Math.round((projDone / projTotal) * 100);
+                const statusColor = proj.statusColor || 'bg-gray-500';
+
+                const card = document.createElement('div');
+                card.className = 'glass-panel rounded-3xl overflow-hidden project-card shadow-xl border border-gray-700/50 h-fit';
+                card.innerHTML = `
+                    <div class="px-5 py-4 cursor-pointer flex justify-between items-center bg-black/20" onclick="toggleAccordion('${proj.id}')">
+                        <div class="flex-1 pr-3 min-w-0">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full ${statusColor} shrink-0"></span>
+                                    <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider truncate">${proj.status || 'Activo'}</span>
+                                </div>
+                                <button onclick="event.stopPropagation(); changeProjectStatus('${proj.id}')" class="text-[9px] text-gray-500 hover:text-white border border-gray-700 px-2 py-0.5 rounded-md transition shrink-0 ml-2">Mover</button>
+                            </div>
+                            <h2 class="text-[18px] font-bold text-white tracking-tight truncate">${proj.name}</h2>
+                            <div class="mt-3 h-2 w-full bg-gray-700/50 rounded-full overflow-hidden flex shadow-inner">
+                                <div class="h-full ${progressPct === 100 ? 'bg-emerald-500' : 'bg-white'} transition-all duration-500 ease-out" style="width: ${progressPct}%"></div>
+                            </div>
+                            <span class="text-xs text-gray-400 mt-1 block font-mono">${progressPct}% completado</span>
+                        </div>
+                        <div class="flex flex-col items-center gap-3 ml-1 shrink-0">
+                             <button onclick="event.stopPropagation(); triggerReminderForProject('${proj.id}')" class="w-9 h-9 rounded-2xl bg-gray-900/80 flex items-center justify-center text-gray-400 hover:text-white hover:scale-105 transition shadow-inner border border-gray-700">
+                                <i data-lucide="bell" class="w-4 h-4"></i>
+                            </button>
+                            <i data-lucide="chevron-down" id="chevron-${proj.id}" class="w-5 h-5 text-gray-500 chevron open"></i>
+                        </div>
+                    </div>
+                    <div id="content-${proj.id}" class="accordion-content open bg-black/30 border-t border-gray-700/50">
+                        <div class="px-5 py-4 space-y-3">
+                            <div class="space-y-3" id="tasks-list-${proj.id}">
+                                ${proj.tasks && proj.tasks.length > 0 ? proj.tasks.map((task) => `
+                                    <div class="task-row flex items-start justify-between group bg-gray-900/40 p-3 rounded-xl border border-gray-800">
+                                        <label class="flex items-start gap-3 cursor-pointer flex-1 min-w-0 pt-0.5">
+                                            <input type="checkbox" class="checkbox-custom mt-0.5" ${task.done ? 'checked' : ''} onchange="toggleTask('${proj.id}', '${task.id}', this.checked)">
+                                            <span class="task-label text-[13px] text-gray-200 transition leading-tight break-words pr-2">${task.text}</span>
+                                        </label>
+                                        <button onclick="deleteTask('${proj.id}', '${task.id}')" class="text-gray-600 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                    </div>
+                                `).join('') : '<p class="text-xs text-gray-600 italic px-2 py-1">No hay tareas.</p>'}
+                            </div>
+                            <div class="pt-3 border-t border-gray-800 flex gap-2.5 w-full items-center">
+                                <div class="relative flex-1 min-w-0">
+                                    <input type="text" id="new-task-${proj.id}" placeholder="Nueva tarea..." onkeydown="if(event.key==='Enter') addTask('${proj.id}')" class="w-full bg-gray-900/70 border border-gray-700 rounded-xl pl-4 pr-10 py-2.5 text-[13px] text-white focus:outline-none focus:border-emerald-500 transition shadow-inner">
+                                    <button onclick="startDictation('new-task-${proj.id}')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-500 p-1">
+                                        <i data-lucide="mic" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                                <button onclick="addTask('${proj.id}')" class="bg-gray-700 hover:bg-gray-600 text-white p-3 rounded-xl text-[13px] font-medium transition shrink-0 active:scale-[0.97]">
+                                    <i data-lucide="plus" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderQuickNotes() {
+            const list = document.getElementById('quick-notes-list');
+            if (appData.quickNotes.length === 0) {
+                list.innerHTML = `<p class="text-gray-500 text-center italic py-2">Vacío.</p>`;
+                return;
+            }
+            list.innerHTML = appData.quickNotes.slice(0, 5).map((note, index) => `
+                <div class="flex items-center justify-between bg-gray-900/50 px-3.5 py-2.5 rounded-xl border border-gray-800 text-gray-300 shadow-inner">
+                    <span class="leading-tight pr-3 break-words flex-1 min-w-0 truncate">${note}</span>
+                    <button onclick="deleteQuickNote(${index})" class="text-gray-500 hover:text-white transition p-1 shrink-0"><i data-lucide="x" class="w-4 h-4"></i></button>
+                </div>
+            `).join('');
+        }
+
+        function renderBriefs() {
+            const list = document.getElementById('briefs-list');
+            if (appData.projects.length === 0) {
+                 list.innerHTML = `<p class="text-gray-500 text-center py-6">No hay proyectos.</p>`;
+                 return;
+            }
+            list.innerHTML = appData.projects.map(p => `
+                <div class="p-5 bg-gray-900 rounded-2xl border border-gray-700 shadow-inner">
+                    <strong class="text-white block mb-1.5 text-[15px]">${p.name}</strong>
+                    <p class="text-gray-400 text-[13px] leading-relaxed">${p.brief || 'Sin brief asignado. Agrega contexto en el chat.'}</p>
+                </div>
+            `).join('');
+        }
+
+        function renderChatLogs() {
+            const list = document.getElementById('chat-messages');
+            if(appData.chatLogs.length === 0) {
+                list.innerHTML = `<div class="bg-gray-800 p-4 rounded-2xl rounded-tl-sm text-gray-200 border border-gray-700 w-[90%] shadow-md">Hola Frank. Estoy listo. Háblame de tus ideas de vuelo o instrucciones para clientes y yo las organizaré en el tablero.</div>`;
+                return;
+            }
+            const lastMessages = appData.chatLogs.slice(-10);
+            list.innerHTML = lastMessages.map(log => {
+                const isUser = typeof log === 'object' && log.from === 'user';
+                return isUser ? 
+                    `<div class="bg-emerald-500/20 text-emerald-100 p-4 rounded-2xl rounded-tr-sm ml-auto w-[90%] border border-emerald-500/30 shadow-md">${log.text}</div>` :
+                    `<div class="bg-gray-800 p-4 rounded-2xl rounded-tl-sm text-gray-200 border border-gray-700 w-[90%] shadow-md">${log}</div>`;
+            }).join('');
+            setTimeout(() => list.scrollTop = list.scrollHeight, 100);
+        }
+
+        window.addTask = function(projId) {
+            const input = document.getElementById(`new-task-${projId}`);
+            const text = input.value.trim();
+            if(!text) return;
+            const proj = appData.projects.find(p => p.id === projId);
+            if(!proj.tasks) proj.tasks = [];
+            proj.tasks.push({ id: 't_' + Date.now(), text, done: false });
+            input.value = '';
+            saveData();
+        }
+
+        window.deleteTask = function(projId, taskId) {
+            if(confirm('¿Eliminar esta tarea?')) {
+                const proj = appData.projects.find(p => p.id === projId);
+                proj.tasks = proj.tasks.filter(t => t.id !== taskId);
+                saveData();
+            }
+        }
+
+        window.toggleTask = function(projId, taskId, isChecked) {
+            const proj = appData.projects.find(p => p.id === projId);
+            const task = proj.tasks.find(t => t.id === taskId);
+            task.done = isChecked;
+            saveData();
+        };
+
+        window.createNewProject = function() {
+            const name = prompt("Nombre de la nueva marca / proyecto:");
+            if(!name) return;
+            appData.projects.unshift({
+                id: 'p_' + Date.now(),
+                name: name,
+                category: 'enfoque',
+                status: 'Enfoque',
+                statusColor: 'bg-emerald-500',
+                brief: 'Nuevo proyecto. Agrega detalles.',
+                tasks: []
+            });
+            saveData();
+        }
+
+        window.changeProjectStatus = function(projId) {
+            const proj = appData.projects.find(p => p.id === projId);
+            const opt = prompt(`Cambiar estado de "${proj.name}".\n1 = 🔥 Enfoque\n2 = 📥 En Cola\n3 = ⏸️ Standby`);
+            if(opt === '1') { proj.category = 'enfoque'; proj.status = 'Enfoque'; proj.statusColor = 'bg-emerald-500'; }
+            else if(opt === '2') { proj.category = 'cola'; proj.status = 'En Cola'; proj.statusColor = 'bg-blue-500'; }
+            else if(opt === '3') { proj.category = 'standby'; proj.status = 'Standby'; proj.statusColor = 'bg-gray-500'; }
+            saveData();
+        }
+
+        window.deleteQuickNote = function(index) {
+            appData.quickNotes.splice(index, 1);
+            saveData();
+        }
+
+        window.deleteReminder = function(index) {
+            appData.reminders.splice(index, 1);
+            saveData();
+        }
+
+        window.triggerReminderForProject = function(projId) {
+            const proj = appData.projects.find(p => p.id === projId);
+            const taskText = prompt(`¿Qué recordatorio crear para "${proj.name}"?`, "Avanzar en diseño");
+            const date = prompt("¿Para cuándo? (Ej: Mañana, Lunes)", "Mañana");
+            if(taskText && date) {
+                appData.reminders.unshift({ text: `${proj.name}: ${taskText}`, date: date, priority: 'Alta' });
+                saveData();
+            }
+        };
+
+        window.setFilter = function(filter) {
+            currentFilter = filter;
+            ['all', 'enfoque', 'cola'].forEach(f => {
+                const btn = document.getElementById(`filter-${f}`);
+                if(f === filter) {
+                    btn.classList.remove('text-gray-400', 'hover:text-white');
+                    btn.classList.add('bg-gray-700', 'text-white', 'shadow');
+                } else {
+                    btn.classList.remove('bg-gray-700', 'text-white', 'shadow');
+                    btn.classList.add('text-gray-400', 'hover:text-white');
+                }
+            });
+            renderProjects();
+        }
+
+        window.toggleAccordion = function(id) {
+            const content = document.getElementById(`content-${id}`);
+            const chevron = document.getElementById(`chevron-${id}`);
+            content.classList.toggle('open');
+            chevron.classList.toggle('open');
+        };
+
+        window.toggleAIChat = () => {
+            const drawer = document.getElementById('ai-chat-drawer');
+            drawer.classList.toggle('hidden');
+            if(!drawer.classList.contains('hidden')) {
+                document.getElementById('chat-input').focus();
+                renderChatLogs();
+            }
+        }
+
+        window.sendChatMessage = () => {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if(!text) return;
+            
+            appData.chatLogs.push({ from: 'user', text: text });
+            input.value = '';
+            
+            setTimeout(() => {
+                const textLower = text.toLowerCase();
+                let response = "";
+                
+                if (textLower.includes('reunión') || textLower.includes('cita')) {
+                    const dateMatch = textLower.match(/(mañana|lunes|martes|miércoles|jueves|viernes|sábado|domingo|\d{1,2}\/\d{1,2})/);
+                    const date = dateMatch ? dateMatch[0] : 'Pronto';
+                    response = `Entendido. He agendado una reunión para ${date}. ¿Algún cliente o proyecto en específico?`;
+                    appData.reminders.unshift({ text: `Reunión: ${text.substring(0,50)}...`, date: date, priority: 'Alta' });
+                } 
+                else if (textLower.includes('idea') || textLower.includes('volar')) {
+                    response = "¡Buena idea! He capturado esto en tu libreta de ideas de vuelo. ¿Es para algún proyecto activo?";
+                    appData.quickNotes.unshift(`💡 Idea: ${text.substring(0,50)}...`);
+                }
+                else {
+                    response = "Interesante. He registrado esta nota en tu historial. Si quieres que la convierta en una tarea o recordatorio, dímelo.";
+                }
+
+                appData.chatLogs.push({ from: 'ai', text: response });
+                saveData();
+            }, 800);
+            
+            saveData();
+        }
+
+        window.openSyncModal = () => document.getElementById('modal-sync').classList.remove('hidden');
+        window.openContextModal = () => { document.getElementById('modal-context').classList.remove('hidden'); renderBriefs(); }
+        window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
+
+        loadData();
+    </script>
+</body>
+</html>
