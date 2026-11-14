@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+final_index_html = """<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -141,15 +141,18 @@
                 </div>
             </div>
 
-            <!-- Agenda Semanal Real Interactiva -->
-            <div class="glass-panel p-3.5 rounded-2xl border border-white/10">
-                <div class="flex items-center justify-between mb-2.5 px-1">
+            <!-- Agenda Semanal Real Interactiva + Resumen Directo de Tareas por Día -->
+            <div class="glass-panel p-3.5 sm:p-4 rounded-2xl border border-white/10 space-y-3">
+                <div class="flex items-center justify-between px-1">
                     <span class="text-[11px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
                         <i data-lucide="calendar-days" class="w-3.5 h-3.5 text-emerald-400"></i> Pendientes por Día de la Semana
                     </span>
                     <span id="week-pending-summary" class="text-[11px] text-gray-400 font-medium">0 agendados</span>
                 </div>
                 <div class="grid grid-cols-7 gap-1.5 sm:gap-2.5" id="weekly-schedule-bar"></div>
+                
+                <!-- Resumen visual inmediato de las tareas agendadas en la semana (Sábado, Lunes, Hoy, etc.) -->
+                <div id="weekly-tasks-digest" class="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2 border-t border-white/5"></div>
             </div>
         </section>
 
@@ -246,7 +249,7 @@
     <!-- Input oculto para subir o tomar foto de la libreta/agenda -->
     <input type="file" id="agenda-photo-input" accept="image/*" capture="environment" class="hidden" onchange="handleAgendaPhotoUpload(event)">
 
-    <!-- Dock Flotante Inferior Limpio (Inicio | Escanear Agenda | Nuevo Cliente) -->
+    <!-- Dock Flotante Inferior Limpio -->
     <div class="fixed bottom-5 sm:bottom-7 w-full flex justify-center z-40 px-4 pointer-events-none">
         <nav class="glass-panel floating-dock rounded-full px-8 py-3.5 flex gap-10 items-center w-full max-w-xs justify-between pointer-events-auto shadow-2xl border border-white/15">
             <button onclick="window.scrollTo({top: 0, behavior: 'smooth'}); clearDayFilter();" class="flex flex-col items-center gap-1 text-white hover:scale-105 transition-transform">
@@ -283,7 +286,7 @@
                     <h3 class="text-sm font-bold text-white">Confirmar Cambios en Tablero</h3>
                     <p class="text-xs text-gray-400" id="ai-modal-subtitle">Revisa o edita antes de aplicar</p>
                 </div>
-                <button onclick="closeAiReviewModal()" class="text-gray-400 hover:text-white text-lg px-2">&times;</button>
+                <button onclick="closeAiReviewModal()" class="text-gray-400 hover:text-white text-lg px-2">×</button>
             </div>
             <div id="modal-actions-list" class="space-y-2.5 overflow-y-auto pr-1 flex-1 text-xs text-gray-300"></div>
             <div class="flex gap-2 pt-2 border-t border-white/10">
@@ -423,7 +426,7 @@
             db.ref('daotto_data_v6').set(appData);
         }
 
-        // Motor Gemini con respaldo automático de modelos para evitar errores por picos de demanda
+        // Motor Gemini con modelos activos y respaldo automático (gemini-2.5-flash -> gemini-2.5-flash-lite -> gemini-1.5-flash)
         async function callGeminiAgent(userText, imageBase64 = null, mimeType = null) {
             const apiKey = localStorage.getItem('daotto_gemini_key');
             if (!apiKey) {
@@ -447,16 +450,16 @@ Hoy es ${todayStr}.
 Estado actual del tablero de proyectos y tareas: ${JSON.stringify(existingProjects)}.
 Recordatorios activos: ${JSON.stringify(activeReminders)}.
 
-Analiza la petición de Frank (texto, consulta sobre sus tareas, actualización de proyectos o foto de agenda/captura).
+Analiza la petición de Frank (texto, consulta sobre sus tareas, nueva orden de tarea o imagen de agenda/captura).
 Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura exacta:
 {
-  "reply": "Respuesta conversacional clara, directa y útil analizando sus tareas o confirmando qué detectaste.",
+  "reply": "Respuesta conversacional clara, directa y útil analizando sus tareas o confirmando lo detectado para guardar en el tablero.",
   "actions": [
     {
       "type": "add_task",
-      "projectName": "Nombre exacto del cliente existente (ej. Peluzzia, Veli Vita, Señor Emiro, Ciudad Café, FastWay) o nuevo cliente",
+      "projectName": "Nombre exacto del cliente existente (ej. Peluzzia, Veli Vita, Señor Emiro, Ciudad Café, FastWay, Natoura, Labomed, Puyaos, Cafetero VE) o nuevo cliente",
       "category": "enfoque",
-      "text": "Descripción clara de la tarea",
+      "text": "Descripción clara y accionable de la tarea",
       "priority": "alta|media|baja",
       "today": true
     },
@@ -475,10 +478,10 @@ Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura exacta:
   ]
 }
 
-Reglas:
-1. Si Frank hace una pregunta o pide un análisis de sus tareas (ej. "¿qué debo priorizar?", "¿cómo va Peluzzia?"), responde detalladamente en "reply" usando los datos reales de su tablero y deja "actions" como arreglo vacío [].
-2. Si Frank da una instrucción o dicta tareas/avances (ej. "Peluzzia nueva grilla 3" o "ya terminé la grilla 2 de peluzzia"), genera las acciones correspondientes en "actions" para que las confirme en el modal.
-3. Si analizas una imagen (libreta, chat o captura), extrae TODAS las tareas y recordatorios accionables asociándolos al cliente correcto.`;
+Reglas obligatorias:
+1. SIEMPRE que Frank escriba un cliente + acción (ej. "peluzzia nueva grilla 3", "hacer artes para ciudad café", "revisar logo señor emiro"), DEBES generar al menos una acción "add_task" con el nombre exacto del cliente ("Peluzzia", "Ciudad Café", "Señor Emiro") y el texto limpio de la tarea ("Nueva Grilla 3"). Si menciona día (ej. "lunes", "sábado", "hoy"), agrega también "add_reminder" con ese día en "dueWhen".
+2. Si Frank hace una pregunta explícita de consulta o análisis (ej. "¿qué debo priorizar hoy?", "¿cómo va Peluzzia?"), responde detalladamente en "reply" usando los datos reales de su tablero y deja "actions" como arreglo vacío [].
+3. Corrige errores de dictado en nombres de clientes ("pelusia" -> "Peluzzia", "beli bita" -> "Veli Vita", "fast way" -> "FastWay").`;
 
             const parts = [{ text: systemPrompt }];
             if (userText) parts.push({ text: `Mensaje de Frank: ${userText}` });
@@ -486,8 +489,7 @@ Reglas:
                 parts.push({ inline_data: { mime_type: mimeType, data: imageBase64 } });
             }
 
-            // Lista de modelos con respaldo automático ante alta demanda (503 / 429)
-            const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+            const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-1.5-flash'];
             let lastError = null;
 
             for (const modelName of models) {
@@ -504,12 +506,8 @@ Reglas:
                     if (!response.ok) {
                         const errData = await response.json().catch(() => ({}));
                         const errMsg = errData?.error?.message || `Error HTTP ${response.status}`;
-                        // Si el modelo está saturado o no disponible, probar el siguiente modelo de respaldo
-                        if (response.status === 503 || response.status === 429 || response.status === 404 || errMsg.toLowerCase().includes('high demand')) {
-                            lastError = new Error(errMsg);
-                            continue;
-                        }
-                        throw new Error(errMsg);
+                        lastError = new Error(errMsg);
+                        continue;
                     }
 
                     const data = await response.json();
@@ -520,7 +518,7 @@ Reglas:
                 }
             }
 
-            throw lastError || new Error("No se pudo conectar con ningún modelo de Gemini.");
+            throw lastError || new Error("No se pudo conectar con Gemini API.");
         }
 
         function openAiReviewModal(result) {
@@ -528,13 +526,13 @@ Reglas:
             const modal = document.getElementById('ai-review-modal');
             const list = document.getElementById('modal-actions-list');
             const subtitle = document.getElementById('ai-modal-subtitle');
-            if (subtitle) subtitle.innerText = result.reply || 'Revisa o edita antes de guardar en tu tablero';
+            if (subtitle) subtitle.innerText = result.reply || 'Revisa o edita antes de guardar en tu tarjeta de cliente';
 
             const existingNames = appData.projects.map(p => p.name.toLowerCase().trim());
             const typeLabels = {
-                'add_task': 'Nueva Tarea',
+                'add_task': 'Nueva Tarea en Ficha',
                 'complete_task': 'Completar Tarea',
-                'add_reminder': 'Nuevo Recordatorio'
+                'add_reminder': 'Recordatorio Semanal'
             };
 
             if (!result.actions || result.actions.length === 0) {
@@ -544,8 +542,8 @@ Reglas:
                     const projName = (act.projectName || 'General').trim();
                     const exists = existingNames.includes(projName.toLowerCase());
                     const badge = exists
-                        ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Ficha existente</span>`
-                        : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">+ Nueva ficha</span>`;
+                        ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Tarjeta existente</span>`
+                        : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">+ Nueva tarjeta</span>`;
 
                     return `
                         <div class="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
@@ -557,9 +555,9 @@ Reglas:
                                 <button onclick="removePendingAction(${idx})" class="text-red-400 hover:text-red-300 text-[11px] font-medium">Descartar</button>
                             </div>
                             <div class="grid grid-cols-1 gap-2">
-                                <input type="text" id="ai-edit-proj-${idx}" value="${projName.replace(/"/g, '&quot;')}" placeholder="Cliente / Ficha"
+                                <input type="text" id="ai-edit-proj-${idx}" value="${projName.replace(/"/g, '"')}" placeholder="Cliente / Ficha"
                                     class="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
-                                <input type="text" id="ai-edit-text-${idx}" value="${(act.text || '').replace(/"/g, '&quot;')}" placeholder="Descripción de tarea o recordatorio"
+                                <input type="text" id="ai-edit-text-${idx}" value="${(act.text || '').replace(/"/g, '"')}" placeholder="Descripción de tarea o recordatorio"
                                     class="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500">
                             </div>
                         </div>
@@ -822,12 +820,15 @@ Reglas:
                 { d: 'DOM', full: 'Domingo' }
             ];
             const container = document.getElementById('weekly-schedule-bar');
+            const digestContainer = document.getElementById('weekly-tasks-digest');
             const now = new Date();
             const todayIndex = (now.getDay() + 6) % 7;
             const monday = new Date(now);
             monday.setDate(now.getDate() - todayIndex);
 
             document.getElementById('week-pending-summary').innerText = `${appData.reminders.length} agendados`;
+
+            const activeDaysWithTasks = [];
 
             container.innerHTML = daysConfig.map((day, idx) => {
                 const cellDate = new Date(monday);
@@ -836,12 +837,24 @@ Reglas:
                 const isToday = idx === todayIndex;
                 const isSelected = selectedDayFilter === day.full;
 
-                const countForDay = appData.reminders.filter(r => {
+                const remindersForDay = appData.reminders.filter(r => {
                     if (!r.date) return false;
                     const dLow = r.date.toLowerCase();
                     if (isToday && (dLow.includes('hoy') || dLow.includes('revisar'))) return true;
                     return dLow.includes(day.full.toLowerCase());
-                }).length;
+                });
+
+                if (remindersForDay.length > 0) {
+                    activeDaysWithTasks.push({
+                        dayShort: day.d,
+                        dayFull: day.full,
+                        dayNum: dayNum,
+                        isToday: isToday,
+                        items: remindersForDay
+                    });
+                }
+
+                const countForDay = remindersForDay.length;
 
                 return `
                     <button onclick="toggleDayFilter('${day.full}')" class="flex flex-col items-center justify-between p-2.5 rounded-2xl border transition text-center ${
@@ -859,6 +872,30 @@ Reglas:
                     </button>
                 `;
             }).join('');
+
+            // Renderizar tarjetas resumen directas de los días con tareas (ej. Sábado, Lunes)
+            if (digestContainer) {
+                if (activeDaysWithTasks.length === 0) {
+                    digestContainer.innerHTML = `<p class="text-[11.5px] text-gray-500 italic px-1 md:col-span-2">Sin tareas agendadas en los días de esta semana.</p>`;
+                } else {
+                    digestContainer.innerHTML = activeDaysWithTasks.map(d => `
+                        <div class="dark-card p-3 rounded-2xl border border-white/10 flex items-start gap-3">
+                            <div class="flex flex-col items-center justify-center bg-gray-900 border border-emerald-500/30 rounded-xl px-2.5 py-1.5 shrink-0 min-w-[46px]">
+                                <span class="text-[9px] font-bold text-emerald-400 uppercase">${d.dayShort}</span>
+                                <span class="text-base font-extrabold text-white leading-tight">${d.dayNum}</span>
+                            </div>
+                            <ul class="space-y-1 flex-1 min-w-0">
+                                ${d.items.map(item => `
+                                    <li class="text-[12px] text-gray-200 flex items-start gap-1.5 leading-snug">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0"></span>
+                                        <span class="truncate" title="${item.text}">${item.text}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    `).join('');
+                }
+            }
         }
 
         window.toggleMyDayFilter = () => {
@@ -1185,7 +1222,7 @@ Reglas:
             const proj = appData.projects.find(p => p.id === projId);
             const taskText = prompt(`¿Qué recordatorio crear para "${proj.name}"?`, "Avanzar en diseño");
             if (!taskText) return;
-            const date = prompt("¿Para qué día? (Ej: Hoy, Lunes, Martes, Miércoles, Jueves, Viernes)", "Hoy");
+            const date = prompt("¿Para qué día? (Ej: Hoy, Lunes, Martes, Miércoles, Jueves, Viernes, Sábado)", "Hoy");
             if (date) {
                 appData.reminders.unshift({ text: `${proj.name}: ${taskText}`, date: date, priority: 'Alta' });
                 saveData();
@@ -1222,3 +1259,9 @@ Reglas:
     </script>
 </body>
 </html>
+"""
+
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(final_index_html)
+
+print("Archivo final index.html generado.")
