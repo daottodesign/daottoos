@@ -74,7 +74,7 @@
     <!-- Contenedor Principal -->
     <div class="w-full max-w-7xl mx-auto flex-1 flex flex-col mt-2">
         
-        <!-- Panel de Control Ejecutivo (Asana Overview + Agenda Semanal Real) -->
+        <!-- Panel de Control Ejecutivo -->
         <section class="px-4 sm:px-6 pt-5 pb-3 w-full">
             <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5">
                 <div>
@@ -92,7 +92,7 @@
                 </div>
             </div>
 
-            <!-- 4 KPI Cards Interactivos (Estilo Asana Overview) -->
+            <!-- 4 KPI Cards Interactivos -->
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                 <button onclick="setFilter('all')" class="glass-panel p-4 rounded-2xl border border-white/10 text-left hover:border-amber-400/40 transition">
                     <div class="flex items-center justify-between text-gray-400 mb-1.5">
@@ -153,34 +153,49 @@
             </div>
         </section>
 
-        <!-- Cuerpo Principal: Columna Izquierda + Tablero de Clientes -->
+        <!-- Cuerpo Principal: Columna Izquierda (Chat IA + Recordatorios) + Tablero de Clientes -->
         <div class="flex flex-col lg:flex-row gap-6 px-4 sm:px-6 w-full mt-2">
             
-            <!-- Columna Izquierda: Captura Inteligente con Gemini y Recordatorios -->
-            <div class="w-full lg:w-[340px] flex flex-col gap-5 shrink-0 lg:sticky lg:top-20 lg:h-[calc(100vh-110px)] lg:overflow-y-auto">
+            <!-- Columna Izquierda: Chat IA Integrado en Panel Principal + Recordatorios -->
+            <div class="w-full lg:w-[360px] flex flex-col gap-5 shrink-0 lg:sticky lg:top-20 lg:h-[calc(100vh-110px)] lg:overflow-y-auto">
                 
-                <!-- Captura Rápida Conectada a Gemini -->
+                <!-- Asistente Chat IA Directo en el Panel Principal -->
                 <section class="w-full">
-                    <div class="glass-panel p-5 rounded-3xl w-full shadow-xl border border-emerald-500/20">
-                        <div class="flex items-center justify-between mb-3.5">
-                            <h3 class="text-[12px] font-bold uppercase tracking-wider text-gray-200 flex items-center gap-2">
-                                <i data-lucide="sparkles" class="w-4 h-4 text-emerald-400"></i> Captura Rápida IA
-                            </h3>
-                            <span class="text-[10px] text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full font-semibold">Auto-Sync</span>
+                    <div class="glass-panel p-5 rounded-3xl w-full shadow-xl border border-emerald-500/25 flex flex-col">
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <h3 class="text-[13px] font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                                    <i data-lucide="sparkles" class="w-4 h-4 text-emerald-400"></i> Chat IA · DaottoOS
+                                </h3>
+                                <p class="text-[11px] text-gray-400 mt-0.5">Analiza tareas, actualiza estados o dicta órdenes</p>
+                            </div>
+                            <button onclick="clearChatHistory()" title="Limpiar historial de chat" class="text-[10px] text-gray-400 hover:text-white bg-gray-900/80 border border-gray-700/80 px-2.5 py-1 rounded-full transition">Limpiar</button>
                         </div>
-                        <div class="flex flex-col gap-2.5 w-full">
-                            <div class="relative w-full">
-                                <input type="text" id="quick-note-input" placeholder="Ej: Enviar artes a Ciudad Café mañana..." onkeydown="if(event.key==='Enter') processSmartNote()" class="w-full bg-gray-900/80 border border-gray-700 rounded-2xl pl-4 pr-11 py-3.5 text-[13px] text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition shadow-inner">
-                                <button onclick="startDictation('quick-note-input')" title="Dictar por voz" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-400 transition p-1.5">
-                                    <i data-lucide="mic" class="w-4 h-4"></i>
+
+                        <!-- Historial de Conversación -->
+                        <div id="chat-messages" class="space-y-3 max-h-60 min-h-[130px] overflow-y-auto pr-1 text-[12.5px] mb-3.5"></div>
+
+                        <!-- Sugerencias rápidas de análisis -->
+                        <div class="flex gap-1.5 overflow-x-auto pb-2.5 mb-2">
+                            <button onclick="sendQuickPrompt('Analiza mis tareas pendientes y dime qué debo priorizar hoy')" class="text-[10.5px] whitespace-nowrap bg-gray-900/90 hover:bg-gray-800 text-emerald-300 border border-emerald-500/25 px-2.5 py-1 rounded-full transition">📊 Analizar prioridades</button>
+                            <button onclick="sendQuickPrompt('¿Qué clientes están en Enfoque y qué les falta?')" class="text-[10.5px] whitespace-nowrap bg-gray-900/90 hover:bg-gray-800 text-gray-300 border border-gray-700 px-2.5 py-1 rounded-full transition">🔥 Resumen Enfoque</button>
+                        </div>
+
+                        <!-- Barra de Entrada del Chat IA -->
+                        <div class="flex gap-2 w-full items-center pt-2 border-t border-white/10">
+                            <button onclick="triggerAgendaScanner()" title="Analizar foto o captura" class="w-10 h-10 rounded-xl bg-gray-900 border border-gray-700 text-gray-300 hover:text-emerald-400 flex items-center justify-center shrink-0 transition">
+                                <i data-lucide="image-plus" class="w-4 h-4"></i>
+                            </button>
+                            <div class="relative flex-1 min-w-0">
+                                <input type="text" id="chat-input" placeholder="Ej: Peluzzia nueva grilla 3..." onkeydown="if(event.key==='Enter') sendChatMessage()" class="w-full bg-gray-900/90 border border-gray-700 rounded-xl pl-3.5 pr-9 py-2.5 text-[12.5px] text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition shadow-inner">
+                                <button onclick="startDictation('chat-input')" title="Dictar por voz" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-400 transition p-1">
+                                    <i data-lucide="mic" class="w-3.5 h-3.5"></i>
                                 </button>
                             </div>
-                            <button id="quick-note-btn" onclick="processSmartNote()" class="w-full bg-white text-black px-4 py-3 rounded-2xl font-bold text-[13px] hover:bg-gray-200 transition shadow-lg active:scale-[0.99] flex items-center justify-center gap-2">
-                                <i data-lucide="wand-2" class="w-4 h-4"></i> Procesar y Actualizar Todo
+                            <button id="chat-send-btn" onclick="sendChatMessage()" class="bg-emerald-500 text-black w-10 h-10 rounded-xl flex items-center justify-center shrink-0 hover:bg-emerald-400 active:scale-[0.97] transition shadow-lg font-bold">
+                                <i data-lucide="arrow-up" class="w-4 h-4"></i>
                             </button>
                         </div>
-                        <div id="quick-note-feedback" class="hidden mt-3 text-[12px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 px-3.5 py-2.5 rounded-xl leading-snug"></div>
-                        <div id="quick-notes-list" class="space-y-2 mt-3.5 max-h-32 overflow-y-auto pr-1 text-[12px] text-gray-300"></div>
                     </div>
                 </section>
 
@@ -193,12 +208,12 @@
                             </h3>
                             <span class="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full" id="reminders-count">0</span>
                         </div>
-                        <div id="reminders-list" class="space-y-2.5 max-h-64 overflow-y-auto pr-1"></div>
+                        <div id="reminders-list" class="space-y-2.5 max-h-60 overflow-y-auto pr-1"></div>
                     </div>
                 </section>
             </div>
 
-            <!-- Columna Derecha: Tablero Arrastrable de Clientes (Trello + Asana) -->
+            <!-- Columna Derecha: Tablero Arrastrable de Clientes -->
             <div class="w-full flex flex-col">
                 <div class="mb-5 sticky top-20 z-30">
                     <div class="glass-panel p-2 rounded-2xl shadow-lg border-gray-700/50 flex flex-col sm:flex-row gap-2">
@@ -231,57 +246,49 @@
     <!-- Input oculto para subir o tomar foto de la libreta/agenda -->
     <input type="file" id="agenda-photo-input" accept="image/*" capture="environment" class="hidden" onchange="handleAgendaPhotoUpload(event)">
 
-    <!-- Dock Flotante Inferior (Inicio | Escanear Agenda | Chat IA) -->
-    <div class="fixed bottom-5 sm:bottom-7 w-full flex justify-center z-50 px-4 pointer-events-none">
-        <nav class="glass-panel floating-dock rounded-full px-7 py-3.5 flex gap-9 items-center w-full max-w-xs justify-between pointer-events-auto shadow-2xl border border-white/15">
+    <!-- Dock Flotante Inferior Limpio (Inicio | Escanear Agenda | Nuevo Cliente) -->
+    <div class="fixed bottom-5 sm:bottom-7 w-full flex justify-center z-40 px-4 pointer-events-none">
+        <nav class="glass-panel floating-dock rounded-full px-8 py-3.5 flex gap-10 items-center w-full max-w-xs justify-between pointer-events-auto shadow-2xl border border-white/15">
             <button onclick="window.scrollTo({top: 0, behavior: 'smooth'}); clearDayFilter();" class="flex flex-col items-center gap-1 text-white hover:scale-105 transition-transform">
                 <i data-lucide="layout-grid" class="w-5 h-5"></i>
                 <span class="text-[10px] font-semibold">Inicio</span>
             </button>
             
-            <button onclick="triggerAgendaScanner()" title="Escanear foto de libreta o agenda" class="relative flex items-center justify-center -mt-11 hover:scale-105 transition-transform group">
+            <button onclick="triggerAgendaScanner()" title="Escanear foto de libreta o captura" class="relative flex items-center justify-center -mt-11 hover:scale-105 transition-transform group">
                 <div class="bg-gradient-to-b from-emerald-400 to-emerald-600 text-black rounded-full shadow-2xl border-2 border-black/40 flex items-center justify-center w-16 h-16">
                     <i data-lucide="camera" class="w-7 h-7 stroke-[2]"></i>
                 </div>
                 <span class="absolute -bottom-5 text-[10px] font-bold text-emerald-400 whitespace-nowrap">Agenda</span>
             </button>
             
-            <button onclick="toggleAIChat()" class="flex flex-col items-center gap-1 text-gray-300 hover:text-emerald-400 hover:scale-105 transition-transform">
-                <i data-lucide="message-square-sparkles" class="w-5 h-5"></i>
-                <span class="text-[10px] font-semibold">Chat IA</span>
+            <button onclick="createNewProject()" class="flex flex-col items-center gap-1 text-gray-300 hover:text-emerald-400 hover:scale-105 transition-transform">
+                <i data-lucide="folder-plus" class="w-5 h-5"></i>
+                <span class="text-[10px] font-semibold">Cliente</span>
             </button>
         </nav>
     </div>
 
-    <!-- Modal Drawer Chat Gemini -->
-    <div id="ai-chat-drawer" class="hidden fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex flex-col justify-end transition-opacity p-2 sm:p-0">
-        <div class="glass-panel w-full max-w-lg mx-auto rounded-t-[32px] p-6 border-t-2 border-emerald-500/30 flex flex-col h-[85vh] shadow-2xl mb-2 sm:mb-0">
-            <div class="w-14 h-1.5 bg-gray-600 rounded-full mx-auto mb-5"></div>
-            <div class="flex justify-between items-center mb-4">
-                <div>
-                    <h3 class="text-[19px] font-bold text-white flex items-center gap-2.5">
-                        <i data-lucide="sparkles" class="w-5 h-5 text-emerald-400"></i> Asistente DaottoOS
-                    </h3>
-                    <p class="text-[11px] text-gray-400">Organiza tareas, clientes y fotos de tu agenda</p>
-                </div>
-                <button onclick="toggleAIChat()" class="w-9 h-9 bg-gray-800 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            
-            <div id="chat-messages" class="flex-1 overflow-y-auto space-y-4 text-[13.5px] pb-4 pr-1"></div>
+    <!-- Pantalla de Carga IA -->
+    <div id="ai-loading-overlay" class="fixed inset-0 z-[115] bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
+        <div class="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mb-3"></div>
+        <p class="text-sm font-semibold text-white" id="ai-loading-title">Analizando con Daotto IA...</p>
+        <p class="text-xs text-gray-400 mt-1">Sincronizando proyectos, tareas y recordatorios</p>
+    </div>
 
-            <div class="pt-3 border-t border-gray-800 flex gap-2.5 w-full items-center">
-                <button onclick="triggerAgendaScanner()" title="Subir foto de agenda" class="w-12 h-12 rounded-full bg-gray-900 border border-gray-700 text-gray-300 hover:text-emerald-400 flex items-center justify-center shrink-0 transition">
-                    <i data-lucide="image-plus" class="w-5 h-5"></i>
-                </button>
-                <div class="relative flex-1">
-                    <input type="text" id="chat-input" placeholder="Escribe o dicta instrucciones..." onkeydown="if(event.key==='Enter') sendChatMessage()" class="w-full bg-gray-900 border border-gray-700 rounded-full pl-4 pr-11 py-3.5 text-[13.5px] text-white focus:outline-none focus:border-emerald-500 transition shadow-inner">
-                    <button onclick="startDictation('chat-input')" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-400 transition p-1">
-                        <i data-lucide="mic" class="w-4 h-4"></i>
-                    </button>
+    <!-- Modal de Confirmación de Acciones IA -->
+    <div id="ai-review-modal" class="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md hidden items-end sm:items-center justify-center p-4">
+        <div class="w-full max-w-md bg-[#121417] border border-white/15 rounded-2xl p-4 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                <div>
+                    <h3 class="text-sm font-bold text-white">Confirmar Cambios en Tablero</h3>
+                    <p class="text-xs text-gray-400" id="ai-modal-subtitle">Revisa o edita antes de aplicar</p>
                 </div>
-                <button id="chat-send-btn" onclick="sendChatMessage()" class="bg-emerald-500 text-black w-12 h-12 rounded-full flex items-center justify-center shrink-0 hover:bg-emerald-400 active:scale-[0.98] transition shadow-lg">
-                    <i data-lucide="arrow-up" class="w-5 h-5"></i>
-                </button>
+                <button onclick="closeAiReviewModal()" class="text-gray-400 hover:text-white text-lg px-2">&times;</button>
+            </div>
+            <div id="modal-actions-list" class="space-y-2.5 overflow-y-auto pr-1 flex-1 text-xs text-gray-300"></div>
+            <div class="flex gap-2 pt-2 border-t border-white/10">
+                <button onclick="closeAiReviewModal()" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-300 transition">Cancelar</button>
+                <button onclick="confirmAiReviewModal()" class="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-black transition">Aceptar y Guardar</button>
             </div>
         </div>
     </div>
@@ -296,26 +303,13 @@
                 <button onclick="closeModal('modal-apikey')" class="text-gray-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             <p class="text-[13px] text-gray-300 mb-4 leading-relaxed">
-                Pega tu API Key de Google AI Studio. Se guarda únicamente en tu navegador (<code class="text-emerald-400">localStorage</code>) para activar el escáner de fotos de agenda, el chat y la captura inteligente sin exponerla en GitHub.
+                Pega tu API Key de Google AI Studio. Se guarda únicamente en tu navegador (<code class="text-emerald-400">localStorage</code>) para activar el Chat IA y el escáner de fotos sin exponerla en GitHub.
             </p>
             <input type="password" id="gemini-api-key-input" placeholder="AIzaSy..." class="w-full bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3.5 text-[13px] text-white mb-4 focus:outline-none focus:border-emerald-500">
             <div class="flex gap-2.5">
                 <button onclick="saveGeminiApiKey()" class="flex-1 bg-emerald-500 text-black font-bold py-3.5 rounded-2xl text-[14px] hover:bg-emerald-400 transition">Guardar Clave</button>
                 <button onclick="closeModal('modal-apikey')" class="px-5 bg-gray-800 text-gray-300 font-semibold py-3.5 rounded-2xl text-[14px]">Cerrar</button>
             </div>
-        </div>
-    </div>
-
-    <!-- Modal Escaneo de Foto en Progreso / Resultado -->
-    <div id="modal-scan-preview" class="hidden fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center px-4">
-        <div class="glass-panel p-6 rounded-[28px] w-full max-w-md shadow-2xl border border-emerald-500/30 text-center">
-            <img id="scan-preview-img" src="" class="w-full max-h-56 object-contain rounded-2xl mb-4 border border-white/10 bg-black/50">
-            <div id="scan-status-box" class="py-2">
-                <div class="inline-block w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin mb-2"></div>
-                <p class="text-sm font-semibold text-white">Analizando trazos y notas con Gemini Vision...</p>
-                <p class="text-xs text-gray-400 mt-1">Extrayendo clientes, tareas y fechas para tu tablero</p>
-            </div>
-            <button id="scan-close-btn" onclick="closeModal('modal-scan-preview')" class="hidden w-full mt-4 bg-white text-black font-bold py-3 rounded-2xl text-sm">Listo</button>
         </div>
     </div>
 
@@ -328,6 +322,7 @@
         let selectedDayFilter = null;
         let onlyTodayTasks = false;
         let sortableInstance = null;
+        let pendingAiResult = null;
 
         const firebaseConfig = { 
             databaseURL: "https://daotto-327c2-default-rtdb.firebaseio.com/"
@@ -361,10 +356,24 @@
                 { id: 'p8', name: 'Puyaos', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Diseño de etiqueta de café.', tasks: [{ id: 't8_1', text: 'Finalizar etiqueta de café', done: false, priority: 'media', today: false }] },
                 { id: 'p9', name: 'Cafetero VE', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Doypack, empaque y planimetría.', tasks: [{ id: 't9_1', text: 'Revisión de empaque con cliente', done: false, priority: 'baja', today: false }] }
             ],
-            quickNotes: [],
             reminders: [],
             chatLogs: []
         };
+
+        function showLoading(show, title = "Analizando con Daotto IA...") {
+            const loader = document.getElementById('ai-loading-overlay');
+            const titleEl = document.getElementById('ai-loading-title');
+            if (titleEl) titleEl.innerText = title;
+            if (loader) {
+                if (show) {
+                    loader.classList.remove('hidden');
+                    loader.classList.add('flex');
+                } else {
+                    loader.classList.add('hidden');
+                    loader.classList.remove('flex');
+                }
+            }
+        }
 
         function updateApiKeyIndicator() {
             const key = localStorage.getItem('daotto_gemini_key');
@@ -401,7 +410,6 @@
                 if (data) {
                     appData = { ...appData, ...data };
                     appData.projects = Array.isArray(appData.projects) ? appData.projects : Object.values(appData.projects || {});
-                    appData.quickNotes = Array.isArray(appData.quickNotes) ? appData.quickNotes : Object.values(appData.quickNotes || {});
                     appData.reminders = Array.isArray(appData.reminders) ? appData.reminders : Object.values(appData.reminders || {});
                     appData.chatLogs = Array.isArray(appData.chatLogs) ? appData.chatLogs : Object.values(appData.chatLogs || {});
                     updateUI();
@@ -415,127 +423,231 @@
             db.ref('daotto_data_v6').set(appData);
         }
 
-        async function callGeminiBoardAgent(userText, imageBase64 = null, imageMime = null) {
+        // Motor Gemini con respaldo automático de modelos para evitar errores por picos de demanda
+        async function callGeminiAgent(userText, imageBase64 = null, mimeType = null) {
             const apiKey = localStorage.getItem('daotto_gemini_key');
             if (!apiKey) {
                 openApiKeyModal();
                 throw new Error("Falta configurar tu Gemini API Key.");
             }
 
-            const existingProjects = appData.projects.map(p => `${p.name} (${p.status})`).join(', ');
+            const existingProjects = appData.projects.map(p => ({
+                nombre: p.name,
+                estado: p.status,
+                brief: p.brief,
+                tareasPendientes: (p.tasks || []).filter(t => !t.done).map(t => t.text),
+                tareasCompletadas: (p.tasks || []).filter(t => t.done).map(t => t.text)
+            }));
+
+            const activeReminders = appData.reminders.map(r => `${r.text} (${r.date || 'Hoy'})`);
             const todayStr = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-            const systemPrompt = `Eres el motor inteligente de DaottoOS para Frank (Director Creativo de Hiuga Brand Group y fundador de Cospe Café en Boconó, Venezuela).
+            const systemPrompt = `Eres el Asistente IA de DaottoOS para Frank (Director Creativo de Hiuga Brand Group y fundador de Cospe Café en Boconó, Venezuela).
 Hoy es ${todayStr}.
-Proyectos existentes en el tablero: [${existingProjects}].
+Estado actual del tablero de proyectos y tareas: ${JSON.stringify(existingProjects)}.
+Recordatorios activos: ${JSON.stringify(activeReminders)}.
 
-Analiza la instrucción de texto y/o la imagen de la libreta/agenda manuscrita de Frank.
-Extrae acciones concretas y responde ÚNICAMENTE con un objeto JSON válido (sin markdown, sin bloques de código) con esta estructura exacta:
+Analiza la petición de Frank (texto, consulta sobre sus tareas, actualización de proyectos o foto de agenda/captura).
+Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura exacta:
 {
-  "reply": "Respuesta breve, directa y útil para Frank confirmando lo que se actualizó en el tablero.",
+  "reply": "Respuesta conversacional clara, directa y útil analizando sus tareas o confirmando qué detectaste.",
   "actions": [
     {
       "type": "add_task",
-      "projectName": "Nombre exacto del cliente existente o nuevo cliente",
+      "projectName": "Nombre exacto del cliente existente (ej. Peluzzia, Veli Vita, Señor Emiro, Ciudad Café, FastWay) o nuevo cliente",
       "category": "enfoque",
-      "taskText": "Descripción clara de la tarea",
+      "text": "Descripción clara de la tarea",
       "priority": "alta|media|baja",
-      "today": true,
-      "brief": "Contexto breve opcional si es proyecto nuevo"
+      "today": true
+    },
+    {
+      "type": "complete_task",
+      "projectName": "Nombre del cliente existente",
+      "text": "Texto de la tarea ya completada"
     },
     {
       "type": "add_reminder",
-      "text": "Texto del recordatorio (incluye cliente y hora si aplica)",
-      "dayOfWeek": "Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo|Hoy",
+      "projectName": "Cliente asociado",
+      "text": "Cliente: Recordatorio accionable",
+      "dueWhen": "Hoy|Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo",
       "priority": "Alta|Media"
-    },
-    {
-      "type": "add_note",
-      "text": "Idea rápida o nota suelta si no pertenece a una tarea"
     }
   ]
 }
+
 Reglas:
-- Si la imagen tiene varias líneas o viñetas manuscritas, extrae TODAS las tareas y recordatorios que identifiques.
-- Si mencionas un cliente parecido a uno existente (ej. 'Emiro' -> 'Señor Emiro', 'Veli' -> 'Veli Vita'), usa el nombre exacto del proyecto existente.
-- Si se menciona un día o fecha (ej. 'lunes', 'mañana', 'hoy'), crea también un elemento 'add_reminder' con el campo 'dayOfWeek' correspondiente.`;
+1. Si Frank hace una pregunta o pide un análisis de sus tareas (ej. "¿qué debo priorizar?", "¿cómo va Peluzzia?"), responde detalladamente en "reply" usando los datos reales de su tablero y deja "actions" como arreglo vacío [].
+2. Si Frank da una instrucción o dicta tareas/avances (ej. "Peluzzia nueva grilla 3" o "ya terminé la grilla 2 de peluzzia"), genera las acciones correspondientes en "actions" para que las confirme en el modal.
+3. Si analizas una imagen (libreta, chat o captura), extrae TODAS las tareas y recordatorios accionables asociándolos al cliente correcto.`;
 
             const parts = [{ text: systemPrompt }];
-            if (userText) {
-                parts.push({ text: `Entrada de Frank: ${userText}` });
+            if (userText) parts.push({ text: `Mensaje de Frank: ${userText}` });
+            if (imageBase64 && mimeType) {
+                parts.push({ inline_data: { mime_type: mimeType, data: imageBase64 } });
             }
-            if (imageBase64 && imageMime) {
-                parts.push({
-                    inline_data: {
-                        mime_type: imageMime,
-                        data: imageBase64
+
+            // Lista de modelos con respaldo automático ante alta demanda (503 / 429)
+            const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+            let lastError = null;
+
+            for (const modelName of models) {
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts }],
+                            generationConfig: { temperature: 0.2, responseMimeType: "application/json" }
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        const errMsg = errData?.error?.message || `Error HTTP ${response.status}`;
+                        // Si el modelo está saturado o no disponible, probar el siguiente modelo de respaldo
+                        if (response.status === 503 || response.status === 429 || response.status === 404 || errMsg.toLowerCase().includes('high demand')) {
+                            lastError = new Error(errMsg);
+                            continue;
+                        }
+                        throw new Error(errMsg);
                     }
-                });
+
+                    const data = await response.json();
+                    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+                    return JSON.parse(rawText);
+                } catch (err) {
+                    lastError = err;
+                }
             }
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts }],
-                    generationConfig: {
-                        temperature: 0.2,
-                        responseMimeType: "application/json"
-                    }
-                })
-            });
-
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData?.error?.message || `Error HTTP ${response.status}`);
-            }
-
-            const result = await response.json();
-            const rawText = result?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-            return JSON.parse(rawText);
+            throw lastError || new Error("No se pudo conectar con ningún modelo de Gemini.");
         }
 
-        function applyGeminiActions(aiResult) {
-            if (!aiResult || !Array.isArray(aiResult.actions)) return 0;
+        function openAiReviewModal(result) {
+            pendingAiResult = result;
+            const modal = document.getElementById('ai-review-modal');
+            const list = document.getElementById('modal-actions-list');
+            const subtitle = document.getElementById('ai-modal-subtitle');
+            if (subtitle) subtitle.innerText = result.reply || 'Revisa o edita antes de guardar en tu tablero';
+
+            const existingNames = appData.projects.map(p => p.name.toLowerCase().trim());
+            const typeLabels = {
+                'add_task': 'Nueva Tarea',
+                'complete_task': 'Completar Tarea',
+                'add_reminder': 'Nuevo Recordatorio'
+            };
+
+            if (!result.actions || result.actions.length === 0) {
+                list.innerHTML = `<p class="text-xs text-gray-400 text-center py-4">No se detectaron cambios nuevos para aplicar.</p>`;
+            } else {
+                list.innerHTML = result.actions.map((act, idx) => {
+                    const projName = (act.projectName || 'General').trim();
+                    const exists = existingNames.includes(projName.toLowerCase());
+                    const badge = exists
+                        ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Ficha existente</span>`
+                        : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">+ Nueva ficha</span>`;
+
+                    return `
+                        <div class="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-semibold text-emerald-400">${typeLabels[act.type] || 'Acción'}</span>
+                                    ${badge}
+                                </div>
+                                <button onclick="removePendingAction(${idx})" class="text-red-400 hover:text-red-300 text-[11px] font-medium">Descartar</button>
+                            </div>
+                            <div class="grid grid-cols-1 gap-2">
+                                <input type="text" id="ai-edit-proj-${idx}" value="${projName.replace(/"/g, '&quot;')}" placeholder="Cliente / Ficha"
+                                    class="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                                <input type="text" id="ai-edit-text-${idx}" value="${(act.text || '').replace(/"/g, '&quot;')}" placeholder="Descripción de tarea o recordatorio"
+                                    class="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        window.removePendingAction = (idx) => {
+            if (!pendingAiResult || !pendingAiResult.actions) return;
+            pendingAiResult.actions.splice(idx, 1);
+            openAiReviewModal(pendingAiResult);
+        };
+
+        window.closeAiReviewModal = () => {
+            const modal = document.getElementById('ai-review-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            pendingAiResult = null;
+        };
+
+        window.confirmAiReviewModal = () => {
+            if (!pendingAiResult || !pendingAiResult.actions) {
+                closeAiReviewModal();
+                return;
+            }
+            pendingAiResult.actions.forEach((act, idx) => {
+                const projInput = document.getElementById(`ai-edit-proj-${idx}`);
+                const textInput = document.getElementById(`ai-edit-text-${idx}`);
+                if (projInput) act.projectName = projInput.value.trim();
+                if (textInput) act.text = textInput.value.trim();
+            });
+            applyAiActions(pendingAiResult);
+            closeAiReviewModal();
+        };
+
+        function applyAiActions(result) {
+            if (!result || !Array.isArray(result.actions)) return 0;
             let count = 0;
 
-            aiResult.actions.forEach(act => {
-                if (act.type === 'add_task' && act.taskText) {
+            result.actions.forEach(act => {
+                if (act.type === 'complete_task' && act.projectName) {
+                    const prj = appData.projects.find(p => p.name.toLowerCase().includes(act.projectName.toLowerCase()));
+                    if (prj && Array.isArray(prj.tasks)) {
+                        const target = prj.tasks.find(t => !t.done && t.text.toLowerCase().includes((act.text || '').toLowerCase().slice(0, 12)))
+                                    || prj.tasks.find(t => !t.done);
+                        if (target) {
+                            target.done = true;
+                            count++;
+                        }
+                    }
+                } else if (act.type === 'add_task' && act.text) {
                     const targetName = (act.projectName || 'General').trim();
-                    let proj = appData.projects.find(p => p.name.toLowerCase() === targetName.toLowerCase());
-                    if (!proj) {
-                        const cat = act.category === 'cola' ? 'cola' : (act.category === 'standby' ? 'standby' : 'enfoque');
-                        const statusMap = { enfoque: 'Enfoque', cola: 'En Cola', standby: 'Standby' };
-                        const colorMap = { enfoque: 'bg-emerald-500', cola: 'bg-blue-500', standby: 'bg-gray-500' };
-                        proj = {
+                    let prj = appData.projects.find(p => p.name.toLowerCase() === targetName.toLowerCase());
+                    if (!prj) {
+                        const cat = act.category === 'cola' ? 'cola' : 'enfoque';
+                        prj = {
                             id: 'p_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                             name: targetName,
                             category: cat,
-                            status: statusMap[cat],
-                            statusColor: colorMap[cat],
-                            brief: act.brief || 'Proyecto creado automáticamente desde IA.',
+                            status: cat === 'enfoque' ? 'Enfoque' : 'En Cola',
+                            statusColor: cat === 'enfoque' ? 'bg-emerald-500' : 'bg-blue-500',
+                            brief: 'Ficha creada automáticamente desde Chat IA.',
                             tasks: []
                         };
-                        appData.projects.unshift(proj);
+                        appData.projects.unshift(prj);
                     }
-                    proj.tasks = proj.tasks || [];
-                    proj.tasks.push({
+                    prj.tasks = prj.tasks || [];
+                    prj.tasks.unshift({
                         id: 't_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-                        text: act.taskText,
+                        text: act.text,
                         done: false,
-                        priority: act.priority || 'media',
-                        today: Boolean(act.today)
+                        priority: (act.priority || 'media').toLowerCase(),
+                        today: act.today !== undefined ? Boolean(act.today) : true
                     });
                     count++;
                 } else if (act.type === 'add_reminder' && act.text) {
                     appData.reminders.unshift({
+                        id: 'r_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
                         text: act.text,
-                        date: act.dayOfWeek || 'Hoy',
+                        date: act.dueWhen || 'Hoy',
                         priority: act.priority || 'Alta'
                     });
-                    count++;
-                } else if (act.type === 'add_note' && act.text) {
-                    appData.quickNotes.unshift(act.text);
                     count++;
                 }
             });
@@ -557,108 +669,87 @@ Reglas:
             const file = event.target.files?.[0];
             if (!file) return;
 
+            showLoading(true, "Analizando imagen con Daotto IA...");
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const dataUrl = e.target.result;
                 const base64Data = dataUrl.split(',')[1];
                 const mimeType = file.type || 'image/jpeg';
 
-                const modal = document.getElementById('modal-scan-preview');
-                const imgEl = document.getElementById('scan-preview-img');
-                const statusBox = document.getElementById('scan-status-box');
-                const closeBtn = document.getElementById('scan-close-btn');
-
-                imgEl.src = dataUrl;
-                closeBtn.classList.add('hidden');
-                statusBox.innerHTML = `
-                    <div class="inline-block w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin mb-2"></div>
-                    <p class="text-sm font-semibold text-white">Analizando trazos y notas con Gemini Vision...</p>
-                    <p class="text-xs text-gray-400 mt-1">Extrayendo clientes, tareas y fechas para tu tablero</p>
-                `;
-                modal.classList.remove('hidden');
-
                 try {
-                    const aiResult = await callGeminiBoardAgent(
-                        "Lee esta foto de mi agenda/libreta manuscrita. Extrae todas las tareas pendientes, proyectos de clientes y recordatorios con fecha.",
+                    const aiResult = await callGeminiAgent(
+                        "Lee esta imagen (agenda manuscrita, chat o nota). Extrae todas las tareas pendientes, proyectos de clientes y recordatorios con fecha.",
                         base64Data,
                         mimeType
                     );
-                    const applied = applyGeminiActions(aiResult);
-                    appData.chatLogs.push({ from: 'user', text: '📸 [Foto de agenda escaneada]' });
-                    appData.chatLogs.push({ from: 'ai', text: aiResult.reply || `Listo Frank, actualicé ${applied} elementos desde tu agenda.` });
+                    showLoading(false);
+                    appData.chatLogs.push({ from: 'user', text: '📸 [Imagen enviada para análisis]' });
+                    appData.chatLogs.push({ from: 'ai', text: aiResult.reply || 'He analizado tu imagen.' });
                     saveData();
 
-                    statusBox.innerHTML = `
-                        <div class="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-2">
-                            <i data-lucide="check" class="w-6 h-6"></i>
-                        </div>
-                        <p class="text-sm font-bold text-emerald-400">¡Tablero Actualizado! (${applied} acciones)</p>
-                        <p class="text-xs text-gray-200 mt-1.5 leading-relaxed">${aiResult.reply || 'Tareas y recordatorios sincronizados.'}</p>
-                    `;
-                    lucide.createIcons();
+                    if (aiResult.actions && aiResult.actions.length > 0) {
+                        openAiReviewModal(aiResult);
+                    }
                 } catch (err) {
-                    statusBox.innerHTML = `
-                        <p class="text-sm font-bold text-red-400">No se pudo procesar la foto</p>
-                        <p class="text-xs text-gray-300 mt-1">${err.message}</p>
-                    `;
+                    showLoading(false);
+                    appData.chatLogs.push({ from: 'ai', text: `Error al analizar imagen: ${err.message}` });
+                    saveData();
                 } finally {
-                    closeBtn.classList.remove('hidden');
                     event.target.value = '';
                 }
             };
             reader.readAsDataURL(file);
         };
 
-        async function processSmartNote() {
-            const input = document.getElementById('quick-note-input');
-            const btn = document.getElementById('quick-note-btn');
-            const feedback = document.getElementById('quick-note-feedback');
-            const val = input.value.trim();
-            if (!val) return;
+        window.sendQuickPrompt = (promptText) => {
+            const input = document.getElementById('chat-input');
+            if (input) {
+                input.value = promptText;
+                sendChatMessage();
+            }
+        };
+
+        window.clearChatHistory = () => {
+            appData.chatLogs = [];
+            saveData();
+        };
+
+        window.sendChatMessage = async () => {
+            const input = document.getElementById('chat-input');
+            const sendBtn = document.getElementById('chat-send-btn');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            appData.chatLogs.push({ from: 'user', text });
+            input.value = '';
+            renderChatLogs();
 
             const apiKey = localStorage.getItem('daotto_gemini_key');
             if (!apiKey) {
-                appData.quickNotes.unshift(val);
-                const valLower = val.toLowerCase();
-                const matchedProj = appData.projects.find(p => valLower.includes(p.name.toLowerCase()));
-                if (matchedProj) {
-                    matchedProj.tasks = matchedProj.tasks || [];
-                    matchedProj.tasks.push({ id: 't_' + Date.now(), text: val, done: false, priority: 'media', today: true });
-                    appData.reminders.unshift({ text: `${matchedProj.name}: ${val}`, date: 'Hoy', priority: 'Alta' });
-                } else {
-                    appData.reminders.unshift({ text: val, date: 'Hoy', priority: 'Media' });
-                }
-                input.value = '';
+                appData.chatLogs.push({ from: 'ai', text: 'Configura primero tu clave en el botón superior "Configurar IA" para analizar tus tareas.' });
                 saveData();
-                feedback.innerText = "Guardado en Firebase. Configura tu 'IA Key' arriba para clasificación automática con Gemini.";
-                feedback.classList.remove('hidden');
-                setTimeout(() => feedback.classList.add('hidden'), 4500);
                 return;
             }
 
-            btn.disabled = true;
-            btn.innerHTML = `<span class="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></span> Sincronizando con Gemini...`;
-
+            sendBtn.disabled = true;
+            showLoading(true, "Procesando con Daotto IA...");
             try {
-                const aiResult = await callGeminiBoardAgent(val);
-                const applied = applyGeminiActions(aiResult);
-                if (applied === 0) {
-                    appData.quickNotes.unshift(val);
-                    saveData();
+                const aiResult = await callGeminiAgent(text);
+                showLoading(false);
+                appData.chatLogs.push({ from: 'ai', text: aiResult.reply || 'Análisis completado.' });
+                saveData();
+
+                if (aiResult.actions && aiResult.actions.length > 0) {
+                    openAiReviewModal(aiResult);
                 }
-                input.value = '';
-                feedback.innerText = aiResult.reply || "Tablero actualizado correctamente.";
-                feedback.classList.remove('hidden');
-                setTimeout(() => feedback.classList.add('hidden'), 5000);
             } catch (err) {
-                feedback.innerText = `Error IA: ${err.message}`;
-                feedback.classList.remove('hidden');
+                showLoading(false);
+                appData.chatLogs.push({ from: 'ai', text: `Error IA: ${err.message}` });
+                saveData();
             } finally {
-                btn.disabled = false;
-                btn.innerHTML = `<i data-lucide="wand-2" class="w-4 h-4"></i> Procesar y Actualizar Todo`;
-                lucide.createIcons();
+                sendBtn.disabled = false;
             }
-        }
+        };
 
         function startDictation(inputId) {
             if (window.hasOwnProperty('webkitSpeechRecognition') || window.hasOwnProperty('SpeechRecognition')) {
@@ -693,7 +784,6 @@ Reglas:
             renderWeeklySchedule();
             renderReminders();
             renderProjects();
-            renderQuickNotes();
             renderChatLogs();
             lucide.createIcons();
         }
@@ -1014,24 +1104,11 @@ Reglas:
             }
         };
 
-        function renderQuickNotes() {
-            const list = document.getElementById('quick-notes-list');
-            if (appData.quickNotes.length === 0) {
-                list.innerHTML = `<p class="text-gray-500 text-center italic py-1.5 text-xs">Sin notas sueltas recientes.</p>`;
-                return;
-            }
-            list.innerHTML = appData.quickNotes.slice(0, 5).map((note, index) => `
-                <div class="flex items-center justify-between bg-gray-900/60 px-3 py-2 rounded-xl border border-gray-800 text-gray-300">
-                    <span class="leading-tight pr-2 break-words flex-1 min-w-0 truncate">${note}</span>
-                    <button onclick="deleteQuickNote(${index})" class="text-gray-500 hover:text-white transition p-0.5 shrink-0"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
-                </div>
-            `).join('');
-        }
-
         function renderChatLogs() {
             const list = document.getElementById('chat-messages');
-            if (appData.chatLogs.length === 0) {
-                list.innerHTML = `<div class="bg-gray-800/90 p-4 rounded-2xl rounded-tl-sm text-gray-200 border border-gray-700 w-[90%] shadow-md">Hola Frank. Dime qué tareas quieres asignar a tus clientes o toca el ícono de imagen para analizar una foto de tu libreta.</div>`;
+            if (!list) return;
+            if (!appData.chatLogs || appData.chatLogs.length === 0) {
+                list.innerHTML = `<div class="bg-gray-800/80 p-3.5 rounded-2xl rounded-tl-sm text-gray-200 border border-gray-700/80 w-[92%] shadow-sm">Hola Frank. Pregúntame sobre el estado de tus clientes, dime qué tareas agregar o sube una captura para analizarla.</div>`;
                 return;
             }
             const lastMessages = appData.chatLogs.slice(-14);
@@ -1039,10 +1116,10 @@ Reglas:
                 const isUser = typeof log === 'object' && log.from === 'user';
                 const text = typeof log === 'object' ? log.text : log;
                 return isUser ? 
-                    `<div class="bg-emerald-500/20 text-emerald-100 p-3.5 rounded-2xl rounded-tr-sm ml-auto w-[88%] border border-emerald-500/30 shadow-md">${text}</div>` :
-                    `<div class="bg-gray-800/90 p-3.5 rounded-2xl rounded-tl-sm text-gray-200 border border-gray-700 w-[90%] shadow-md">${text}</div>`;
+                    `<div class="bg-emerald-500/20 text-emerald-100 p-3 rounded-2xl rounded-tr-sm ml-auto w-[88%] border border-emerald-500/30 shadow-sm">${text}</div>` :
+                    `<div class="bg-gray-800/85 p-3 rounded-2xl rounded-tl-sm text-gray-200 border border-gray-700/80 w-[92%] shadow-sm whitespace-pre-line">${text}</div>`;
             }).join('');
-            setTimeout(() => list.scrollTop = list.scrollHeight, 80);
+            setTimeout(() => list.scrollTop = list.scrollHeight, 60);
         }
 
         window.addTask = function(projId) {
@@ -1089,15 +1166,13 @@ Reglas:
 
         window.changeProjectStatus = function(projId) {
             const proj = appData.projects.find(p => p.id === projId);
-            const opt = prompt(`Cambiar estado de "${proj.name}":\n1 = Enfoque\n2 = En Cola\n3 = Standby`);
+            const opt = prompt(`Cambiar estado de "${proj.name}":
+1 = Enfoque
+2 = En Cola
+3 = Standby`);
             if (opt === '1') { proj.category = 'enfoque'; proj.status = 'Enfoque'; proj.statusColor = 'bg-emerald-500'; }
             else if (opt === '2') { proj.category = 'cola'; proj.status = 'En Cola'; proj.statusColor = 'bg-blue-500'; }
             else if (opt === '3') { proj.category = 'standby'; proj.status = 'Standby'; proj.statusColor = 'bg-gray-500'; }
-            saveData();
-        };
-
-        window.deleteQuickNote = function(index) {
-            appData.quickNotes.splice(index, 1);
             saveData();
         };
 
@@ -1140,631 +1215,10 @@ Reglas:
             chevron.classList.toggle('open');
         };
 
-        window.toggleAIChat = () => {
-            const drawer = document.getElementById('ai-chat-drawer');
-            drawer.classList.toggle('hidden');
-            if (!drawer.classList.contains('hidden')) {
-                document.getElementById('chat-input').focus();
-                renderChatLogs();
-            }
-        };
-
-        window.sendChatMessage = async () => {
-            const input = document.getElementById('chat-input');
-            const sendBtn = document.getElementById('chat-send-btn');
-            const text = input.value.trim();
-            if (!text) return;
-            
-            appData.chatLogs.push({ from: 'user', text });
-            input.value = '';
-            renderChatLogs();
-
-            const apiKey = localStorage.getItem('daotto_gemini_key');
-            if (!apiKey) {
-                appData.chatLogs.push({ from: 'ai', text: 'Configura primero tu clave en el botón superior "Configurar IA" para que pueda actualizar el tablero automáticamente.' });
-                saveData();
-                return;
-            }
-
-            sendBtn.disabled = true;
-            try {
-                const aiResult = await callGeminiBoardAgent(text);
-                applyGeminiActions(aiResult);
-                appData.chatLogs.push({ from: 'ai', text: aiResult.reply || 'Tablero actualizado.' });
-                saveData();
-            } catch (err) {
-                appData.chatLogs.push({ from: 'ai', text: `Error al conectar con Gemini: ${err.message}` });
-                saveData();
-            } finally {
-                sendBtn.disabled = false;
-            }
-        };
-
         window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
 
         updateApiKeyIndicator();
         loadData();
     </script>
-    // --- MODAL DE CONFIRMACIÓN DE ACCIONES IA ---
-        let pendingAiResult = null;
-
-        function openAiReviewModal(result) {
-            pendingAiResult = result;
-            let modal = document.getElementById('ai-review-modal');
-            if (!modal) {
-                modal = document.createElement('div');
-                modal.id = 'ai-review-modal';
-                modal.className = 'fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4';
-                document.body.appendChild(modal);
-            }
-
-            const existingNames = appData.projects.map(p => p.name.toLowerCase().trim());
-            const actionsHtml = (result.actions || []).map((act, idx) => {
-                const projName = (act.projectName || 'General').trim();
-                const exists = existingNames.includes(projName.toLowerCase());
-                const badge = exists
-                    ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Ficha existente</span>`
-                    : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">+ Nueva ficha</span>`;
-
-                const typeLabels = {
-                    'add_task': 'Nueva Tarea',
-                    'complete_task': 'Completar Tarea',
-                    'add_reminder': 'Nuevo Recordatorio',
-                    'add_note': 'Nota Rápida'
-                };
-
-                return `
-                    <div class="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2" data-action-idx="${idx}">
-                        <div class="flex items-center justify-between gap-2">
-                            <span class="text-xs font-semibold text-emerald-400">${typeLabels[act.type] || 'Acción'}</span>
-                            ${badge}
-                        </div>
-                        <div class="grid grid-cols-1 gap-2">
-                            <input type="text" id="ai-edit-proj-${idx}" value="${projName}" placeholder="Cliente / Ficha"
-                                class="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
-                            <input type="text" id="ai-edit-text-${idx}" value="${(act.text || '').replace(/"/g, '&quot;')}" placeholder="Descripción de tarea o recordatorio"
-                                class="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500">
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            modal.innerHTML = `
-                <div class="w-full max-w-md bg-[#121417] border border-white/15 rounded-2xl p-4 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
-                    <div class="flex items-center justify-between border-b border-white/10 pb-3">
-                        <div>
-                            <h3 class="text-sm font-bold text-white">Confirmar Análisis de IA</h3>
-                            <p class="text-xs text-gray-400">${result.reply || 'Revisa o edita antes de guardar en tu tablero'}</p>
-                        </div>
-                        <button onclick="closeAiReviewModal()" class="text-gray-400 hover:text-white text-lg px-2">&times;</button>
-                    </div>
-                    <div class="space-y-2.5 overflow-y-auto pr-1 flex-1">
-                        ${actionsHtml || '<p class="text-xs text-gray-400 text-center py-4">No se detectaron tareas nuevas.</p>'}
-                    </div>
-                    <div class="flex gap-2 pt-2 border-t border-white/10">
-                        <button onclick="closeAiReviewModal()" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-300">Cancelar</button>
-                        <button onclick="confirmAiReviewModal()" class="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-black">Aceptar y Guardar</button>
-                    </div>
-                </div>
-            `;
-            modal.classList.remove('hidden');
-        }
-
-        window.closeAiReviewModal = () => {
-            const modal = document.getElementById('ai-review-modal');
-            if (modal) modal.classList.add('hidden');
-            pendingAiResult = null;
-        };
-
-        window.confirmAiReviewModal = () => {
-            if (!pendingAiResult || !pendingAiResult.actions) return;
-            pendingAiResult.actions.forEach((act, idx) => {
-                const projInput = document.getElementById(`ai-edit-proj-${idx}`);
-                const textInput = document.getElementById(`ai-edit-text-${idx}`);
-                if (projInput) act.projectName = projInput.value.trim();
-                if (textInput) act.text = textInput.value.trim();
-            });
-            const count = applyAiActions(pendingAiResult);
-            closeAiReviewModal();
-            if (typeof renderAll === 'function') renderAll();
-        };
-
-        // --- MODAL DE CONFIRMACIÓN DE ACCIONES IA ---
-        let pendingAiResult = null;
-
-        function openAiReviewModal(result) {
-            pendingAiResult = result;
-            let modal = document.getElementById('ai-review-modal');
-            if (!modal) {
-                modal = document.createElement('div');
-                modal.id = 'ai-review-modal';
-                modal.className = 'fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4';
-                document.body.appendChild(modal);
-            }
-
-            const existingNames = appData.projects.map(p => p.name.toLowerCase().trim());
-            const actionsHtml = (result.actions || []).map((act, idx) => {
-                const projName = (act.projectName || 'General').trim();
-                const exists = existingNames.includes(projName.toLowerCase());
-                const badge = exists
-                    ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Ficha existente</span>`
-                    : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">+ Nueva ficha</span>`;
-
-                const typeLabels = {
-                    'add_task': 'Nueva Tarea',
-                    'complete_task': 'Completar Tarea',
-                    'add_reminder': 'Nuevo Recordatorio',
-                    'add_note': 'Nota Rápida'
-                };
-
-                return `
-                    <div class="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2" data-action-idx="${idx}">
-                        <div class="flex items-center justify-between gap-2">
-                            <span class="text-xs font-semibold text-emerald-400">${typeLabels[act.type] || 'Acción'}</span>
-                            ${badge}
-                        </div>
-                        <div class="grid grid-cols-1 gap-2">
-                            <input type="text" id="ai-edit-proj-${idx}" value="${projName}" placeholder="Cliente / Ficha"
-                                class="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
-                            <input type="text" id="ai-edit-text-${idx}" value="${(act.text || '').replace(/"/g, '&quot;')}" placeholder="Descripción de tarea o recordatorio"
-                                class="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500">
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            modal.innerHTML = `
-                <div class="w-full max-w-md bg-[#121417] border border-white/15 rounded-2xl p-4 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
-                    <div class="flex items-center justify-between border-b border-white/10 pb-3">
-                        <div>
-                            <h3 class="text-sm font-bold text-white">Confirmar Análisis de IA</h3>
-                            <p class="text-xs text-gray-400">${result.reply || 'Revisa o edita antes de guardar en tu tablero'}</p>
-                        </div>
-                        <button onclick="closeAiReviewModal()" class="text-gray-400 hover:text-white text-lg px-2">&times;</button>
-                    </div>
-                    <div class="space-y-2.5 overflow-y-auto pr-1 flex-1">
-                        ${actionsHtml || '<p class="text-xs text-gray-400 text-center py-4">No se detectaron tareas nuevas.</p>'}
-                    </div>
-                    <div class="flex gap-2 pt-2 border-t border-white/10">
-                        <button onclick="closeAiReviewModal()" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-300">Cancelar</button>
-                        <button onclick="confirmAiReviewModal()" class="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-black">Aceptar y Guardar</button>
-                    </div>
-                </div>
-            `;
-            modal.classList.remove('hidden');
-        }
-
-        window.closeAiReviewModal = () => {
-            const modal = document.getElementById('ai-review-modal');
-            if (modal) modal.classList.add('hidden');
-            pendingAiResult = null;
-        };
-
-        window.confirmAiReviewModal = () => {
-            if (!pendingAiResult || !pendingAiResult.actions) return;
-            pendingAiResult.actions.forEach((act, idx) => {
-                const projInput = document.getElementById(`ai-edit-proj-${idx}`);
-                const textInput = document.getElementById(`ai-edit-text-${idx}`);
-                if (projInput) act.projectName = projInput.value.trim();
-                if (textInput) act.text = textInput.value.trim();
-            });
-            const count = applyAiActions(pendingAiResult);
-            closeAiReviewModal();
-            if (typeof renderAll === 'function') renderAll();
-        };
-
-        async function callGeminiAgent(userText, imageBase64 = null, mimeType = null) {
-            const apiKey = localStorage.getItem('daotto_gemini_key');
-            if (!apiKey) {
-                openApiKeyModal();
-                throw new Error("Falta configurar tu Gemini API Key.");
-            }
-
-            const existingProjects = appData.projects.map(p => ({
-                nombre: p.name,
-                estado: p.status,
-                tareasPendientes: (p.tasks || []).filter(t => !t.done).map(t => t.text)
-            }));
-
-            const systemPrompt = `Eres el motor de inteligencia de DaottoOS para Frank (Director Creativo de Hiuga / Daotto Design).
-Proyectos y tareas actuales en el tablero: ${JSON.stringify(existingProjects)}.
-
-Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown, sin bloques de código):
-{
-  "reply": "Resumen corto de lo detectado para mostrar en el panel de confirmación",
-  "actions": [
-    {
-      "type": "add_task",
-      "projectName": "Nombre exacto del cliente existente si coincide (ej. Peluzzia, Veli Vita, Señor Emiro, Ciudad Café) o nuevo cliente",
-      "category": "enfoque",
-      "text": "Descripción clara de la tarea",
-      "priority": "Alta|Media|Baja"
-    },
-    {
-      "type": "complete_task",
-      "projectName": "Nombre del cliente existente",
-      "text": "Texto aproximado de la tarea que el usuario indicó que ya está lista"
-    },
-    {
-      "type": "add_reminder",
-      "projectName": "Cliente asociado",
-      "text": "Cliente: Recordatorio accionable con fecha/hora si se menciona",
-      "dueWhen": "Hoy|Mañana|Lunes|Martes|Miércoles|Jueves|Viernes",
-      "priority": "Alta|Media"
-    }
-  ]
-}
-
-Reglas críticas:
-1. Si el usuario menciona avance de un proyecto (ej. "tengo lo de pelusia ya está listo la semana 2 y necesito solicitar la tercera semana"), genera:
-   - Una acción "complete_task" para marcar la semana 2 como lista en Peluzzia.
-   - Una acción "add_task" para "Solicitar tercera semana" en Peluzzia.
-   - Una acción "add_reminder" para recordar dar seguimiento a la tercera semana de Peluzzia.
-2. Corrige errores ortográficos de dictado por voz en nombres de clientes (ej. "pelusia" -> "Peluzzia", "beli bita" -> "Veli Vita").
-3. Si analizas una foto de agenda manuscrita, extrae cada línea como "add_task" o "add_reminder" asociándola al cliente más cercano del tablero.`;
-
-            const parts = [{ text: systemPrompt }];
-            if (userText) parts.push({ text: `Entrada de Frank: ${userText}` });
-            if (imageBase64 && mimeType) {
-                parts.push({ inline_data: { mime_type: mimeType, data: imageBase64 } });
-            }
-
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts }],
-                    generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
-                })
-            });
-
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.error?.message || `Error HTTP ${response.status}`);
-            }
-
-            const data = await response.json();
-            const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-            return JSON.parse(rawText);
-        }
-
-        function applyAiActions(result) {
-            if (!result || !Array.isArray(result.actions)) return 0;
-            let count = 0;
-
-            result.actions.forEach(act => {
-                if (act.type === 'complete_task' && act.projectName) {
-                    const prj = appData.projects.find(p => p.name.toLowerCase().includes(act.projectName.toLowerCase()));
-                    if (prj && Array.isArray(prj.tasks)) {
-                        const target = prj.tasks.find(t => !t.done && t.text.toLowerCase().includes((act.text || '').toLowerCase().slice(0, 12)))
-                                    || prj.tasks.find(t => !t.done);
-                        if (target) {
-                            target.done = true;
-                            count++;
-                        }
-                    }
-                } else if (act.type === 'add_task' && act.text) {
-                    const targetName = (act.projectName || 'General').trim();
-                    let prj = appData.projects.find(p => p.name.toLowerCase() === targetName.toLowerCase());
-                    if (!prj) {
-                        const cat = act.category === 'cola' ? 'cola' : 'enfoque';
-                        prj = {
-                            id: 'p' + Date.now() + Math.floor(Math.random() * 100),
-                            name: targetName,
-                            category: cat,
-                            status: cat === 'enfoque' ? 'Enfoque' : 'En Cola',
-                            statusColor: cat === 'enfoque' ? 'emerald' : 'blue',
-                            brief: 'Ficha creada automáticamente desde análisis IA.',
-                            tasks: []
-                        };
-                        appData.projects.unshift(prj);
-                    }
-                    prj.tasks.unshift({
-                        id: 't' + Date.now() + Math.floor(Math.random() * 100),
-                        text: act.text,
-                        done: false,
-                        priority: act.priority || 'Media',
-                        today: Boolean(act.today)
-                    });
-                    count++;
-                } else if (act.type === 'add_reminder' && act.text) {
-                    appData.reminders.unshift({
-                        id: 'r' + Date.now() + Math.floor(Math.random() * 100),
-                        text: act.text,
-                        done: false,
-                        due: act.dueWhen || 'Hoy',
-                        priority: act.priority || 'Alta'
-                    });
-                    count++;
-                }
-            });
-
-            if (count > 0) saveData();
-            return count;
-        }
-            }));
-
-            const systemPrompt = `Eres el motor de inteligencia de DaottoOS para Frank (Director Creativo de Hiuga / Daotto Design).
-Proyectos y tareas actuales en el tablero: ${JSON.stringify(existingProjects)}.
-
-Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown, sin bloques de código):
-{
-  "reply": "Resumen corto de lo detectado para mostrar en el panel de confirmación",
-  "actions": [
-    {
-      "type": "add_task",
-      "projectName": "Nombre exacto del cliente existente si coincide (ej. Peluzzia, Veli Vita, Señor Emiro, Ciudad Café) o nuevo cliente",
-      "category": "enfoque",
-      "text": "Descripción clara de la tarea",
-      "priority": "Alta|Media|Baja"
-    },
-    {
-      "type": "complete_task",
-      "projectName": "Nombre del cliente existente",
-      "text": "Texto aproximado de la tarea que el usuario indicó que ya está lista"
-    },
-    {
-      "type": "add_reminder",
-      "projectName": "Cliente asociado",
-      "text": "Cliente: Recordatorio accionable con fecha/hora si se menciona",
-      "dueWhen": "Hoy|Mañana|Lunes|Martes|Miércoles|Jueves|Viernes",
-      "priority": "Alta|Media"
-    }
-  ]
-}
-
-Reglas críticas:
-1. Si el usuario menciona avance de un proyecto (ej. "tengo lo de pelusia ya está listo la semana 2 y necesito solicitar la tercera semana"), genera:
-   - Una acción "complete_task" para marcar la semana 2 como lista en Peluzzia.
-   - Una acción "add_task" para "Solicitar tercera semana" en Peluzzia.
-   - Una acción "add_reminder" para recordar dar seguimiento a la tercera semana de Peluzzia.
-2. Corrige errores ortográficos de dictado por voz en nombres de clientes (ej. "pelusia" -> "Peluzzia", "beli bita" -> "Veli Vita").
-3. Si analizas una foto de agenda manuscrita, extrae cada línea como "add_task" o "add_reminder" asociándola al cliente más cercano del tablero.`;
-
-            const parts = [{ text: systemPrompt }];
-            if (userText) parts.push({ text: `Entrada de Frank: ${userText}` });
-            if (imageBase64 && mimeType) {
-                parts.push({ inline_data: { mime_type: mimeType, data: imageBase64 } });
-            }
-
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts }],
-                    generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
-                })
-            });
-
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.error?.message || `Error HTTP ${response.status}`);
-            }
-
-            const data = await response.json();
-            const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-            return JSON.parse(rawText);
-        }
-
-        function applyAiActions(result) {
-            if (!result || !Array.isArray(result.actions)) return 0;
-            let count = 0;
-
-            result.actions.forEach(act => {
-                if (act.type === 'complete_task' && act.projectName) {
-                    const prj = appData.projects.find(p => p.name.toLowerCase().includes(act.projectName.toLowerCase()));
-                    if (prj && Array.isArray(prj.tasks)) {
-                        const target = prj.tasks.find(t => !t.done && t.text.toLowerCase().includes((act.text || '').toLowerCase().slice(0, 12)))
-                                    || prj.tasks.find(t => !t.done);
-                        if (target) {
-                            target.done = true;
-                            count++;
-                        }
-                    }
-                } else if (act.type === 'add_task' && act.text) {
-                    const targetName = (act.projectName || 'General').trim();
-                    let prj = appData.projects.find(p => p.name.toLowerCase() === targetName.toLowerCase());
-                    if (!prj) {
-                        const cat = act.category === 'cola' ? 'cola' : 'enfoque';
-                        prj = {
-                            id: 'p' + Date.now() + Math.floor(Math.random() * 100),
-                            name: targetName,
-                            category: cat,
-                            status: cat === 'enfoque' ? 'Enfoque' : 'En Cola',
-                            statusColor: cat === 'enfoque' ? 'emerald' : 'blue',
-                            brief: 'Ficha creada automáticamente desde análisis IA.',
-                            tasks: []
-                        };
-                        appData.projects.unshift(prj);
-                    }
-                    prj.tasks.unshift({
-                        id: 't' + Date.now() + Math.floor(Math.random() * 100),
-                        text: act.text,
-                        done: false,
-                        priority: act.priority || 'Media',
-                        today: Boolean(act.today)
-                    });
-                    count++;
-                } else if (act.type === 'add_reminder' && act.text) {
-                    appData.reminders.unshift({
-                        id: 'r' + Date.now() + Math.floor(Math.random() * 100),
-                        text: act.text,
-                        done: false,
-                        due: act.dueWhen || 'Hoy',
-                        priority: act.priority || 'Alta'
-                    });
-                    count++;
-                }
-            });
-
-            if (count > 0) saveData();
-            return count;
-        }
-    <!-- 1. MODAL DE CONFIRMACIÓN Y PANTALLA DE CARGA -->
-<div id="ai-loading-overlay" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex flex-col items-center justify-center p-4">
-    <div class="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mb-3"></div>
-    <p class="text-sm font-medium text-white">Analizando imagen con Daotto IA...</p>
-    <p class="text-xs text-gray-400 mt-1">Extrayendo tareas y clientes</p>
-</div>
-
-<div id="ai-review-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
-    <div class="w-full max-w-md bg-[#121417] border border-white/15 rounded-2xl p-4 space-y-4 shadow-2xl">
-        <div class="flex items-center justify-between border-b border-white/10 pb-2">
-            <h3 class="text-sm font-bold text-white">Confirmar Tareas Detectadas</h3>
-            <button onclick="closeAiReviewModal()" class="text-gray-400 hover:text-white text-lg leading-none">×</button>
-        </div>
-        <div id="modal-actions-list" class="space-y-2 max-h-60 overflow-y-auto text-xs text-gray-300"></div>
-        <div class="flex gap-2 pt-2 border-t border-white/10">
-            <button onclick="closeAiReviewModal()" class="flex-1 py-2 rounded bg-white/5 hover:bg-white/10 text-gray-300 transition">Cancelar</button>
-            <button onclick="confirmAiReviewModal()" class="flex-1 py-2 rounded bg-emerald-500 hover:bg-emerald-400 font-bold text-black transition">Aceptar y Guardar</button>
-        </div>
-    </div>
-</div>
-
-<script>
-let pendingAiResult = null;
-
-function showLoading(show) {
-    const loader = document.getElementById('ai-loading-overlay');
-    if (loader) {
-        if (show) loader.classList.remove('hidden');
-        else loader.classList.add('hidden');
-    }
-}
-
-function closeAiReviewModal() {
-    const modal = document.getElementById('ai-review-modal');
-    if (modal) modal.classList.add('hidden');
-    pendingAiResult = null;
-}
-
-function openAiReviewModal(result) {
-    pendingAiResult = result;
-    const modal = document.getElementById('ai-review-modal');
-    const list = document.getElementById('modal-actions-list');
-    
-    if (!result.actions || result.actions.length === 0) {
-        list.innerHTML = `<p class="text-gray-400 text-center py-4">No se detectaron tareas nuevas en la captura.</p>`;
-    } else {
-        list.innerHTML = result.actions.map((act, idx) => `
-            <div class="p-2.5 rounded-lg bg-white/5 border border-white/10 space-y-1.5">
-                <div class="flex justify-between items-center">
-                    <span class="text-[10px] uppercase tracking-wider font-semibold text-emerald-400">${act.type === 'add_reminder' ? 'Recordatorio' : 'Tarea'}</span>
-                    <button onclick="removePendingAction(${idx})" class="text-red-400 hover:text-red-300 text-xs">Descartar</button>
-                </div>
-                <input type="text" id="ai-proj-${idx}" value="${act.projectName || ''}" placeholder="Cliente / Proyecto (ej. Peluzzia, Fast Way)" class="w-full bg-black/50 border border-white/10 rounded px-2 py-1 text-white focus:border-emerald-500 outline-none">
-                <input type="text" id="ai-text-${idx}" value="${act.text || ''}" placeholder="Descripción de la tarea" class="w-full bg-black/50 border border-white/10 rounded px-2 py-1 text-white focus:border-emerald-500 outline-none">
-            </div>
-        `).join('');
-    }
-    modal.classList.remove('hidden');
-}
-
-window.removePendingAction = (idx) => {
-    if (!pendingAiResult || !pendingAiResult.actions) return;
-    pendingAiResult.actions.splice(idx, 1);
-    openAiReviewModal(pendingAiResult);
-};
-
-window.confirmAiReviewModal = () => {
-    if (!pendingAiResult || !pendingAiResult.actions) {
-        closeAiReviewModal();
-        return;
-    }
-    pendingAiResult.actions.forEach((act, idx) => {
-        const projInput = document.getElementById(`ai-proj-${idx}`);
-        const textInput = document.getElementById(`ai-text-${idx}`);
-        if (projInput) act.projectName = projInput.value.trim();
-        if (textInput) act.text = textInput.value.trim();
-    });
-    applyAiActions(pendingAiResult);
-    closeAiReviewModal();
-};
-
-// Función principal para manejar tanto texto como cámara/imagen
-async function handleQuickCapture(userText = '', file = null) {
-    showLoading(true);
-    try {
-        let base64 = null;
-        let mimeType = null;
-
-        if (file) {
-            mimeType = file.type;
-            base64 = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result.split(',')[1]);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-        }
-
-        const result = await callGeminiAgent(userText, base64, mimeType);
-        showLoading(false);
-        openAiReviewModal(result);
-    } catch (error) {
-        showLoading(false);
-        alert("Error al procesar: " + error.message);
-    }
-}
-
-async function callGeminiAgent(userText, imageBase64 = null, mimeType = null) {
-    const apiKey = localStorage.getItem('daotto_gemini_key');
-    if (!apiKey) throw new Error("Falta configurar tu Gemini API Key en Ajustes.");
-
-    const systemPrompt = `Eres el motor de inteligencia de DaottoOS para Frank. Analiza el texto o imagen (chats, notas, capturas) y extrae tareas o recordatorios accionables.
-Identifica el cliente/proyecto si aplica (ej. Peluzzia, Fast Way, Hiuga, Cospe Café, Señor Emiro, Veli Vita, Ciudad Café).
-Devuelve ÚNICAMENTE un JSON válido con esta estructura:
-{
-  "reply": "Resumen breve",
-  "actions": [
-    { "type": "add_task", "projectName": "Nombre del Proyecto", "text": "Descripción clara de la tarea" }
-  ]
-}`;
-
-    const parts = [{ text: systemPrompt }];
-    if (userText) parts.push({ text: "Texto del usuario: " + userText });
-    if (imageBase64) parts.push({ inline_data: { mime_type: mimeType, data: imageBase64 } });
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig: { responseMimeType: "application/json" }
-        })
-    });
-
-    if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error?.message || "Error de conexión con Gemini API");
-    }
-
-    const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-    return JSON.parse(rawText);
-}
-
-function applyAiActions(result) {
-    if (!result.actions || !Array.isArray(result.actions)) return;
-    result.actions.forEach(act => {
-        if (!act.text) return;
-        const projName = act.projectName || 'General';
-        let existingProj = appData.projects.find(p => p.name.toLowerCase() === projName.toLowerCase());
-        
-        if (!existingProj) {
-            existingProj = { id: 'p' + Date.now() + Math.random().toString(36).substr(2, 4), name: projName, tasks: [] };
-            appData.projects.unshift(existingProj);
-        }
-        
-        existingProj.tasks.push({
-            id: 't' + Date.now() + Math.random().toString(36).substr(2, 4),
-            text: act.text,
-            done: false
-        });
-    });
-    if (typeof saveData === 'function') saveData();
-    if (typeof renderAll === 'function') renderAll();
-}
-</script>
 </body>
 </html>
