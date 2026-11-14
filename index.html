@@ -1185,5 +1185,218 @@ Reglas:
         updateApiKeyIndicator();
         loadData();
     </script>
+    // --- MODAL DE CONFIRMACIÓN DE ACCIONES IA ---
+        let pendingAiResult = null;
+
+        function openAiReviewModal(result) {
+            pendingAiResult = result;
+            let modal = document.getElementById('ai-review-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'ai-review-modal';
+                modal.className = 'fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4';
+                document.body.appendChild(modal);
+            }
+
+            const existingNames = appData.projects.map(p => p.name.toLowerCase().trim());
+            const actionsHtml = (result.actions || []).map((act, idx) => {
+                const projName = (act.projectName || 'General').trim();
+                const exists = existingNames.includes(projName.toLowerCase());
+                const badge = exists
+                    ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Ficha existente</span>`
+                    : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">+ Nueva ficha</span>`;
+
+                const typeLabels = {
+                    'add_task': 'Nueva Tarea',
+                    'complete_task': 'Completar Tarea',
+                    'add_reminder': 'Nuevo Recordatorio',
+                    'add_note': 'Nota Rápida'
+                };
+
+                return `
+                    <div class="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2" data-action-idx="${idx}">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-semibold text-emerald-400">${typeLabels[act.type] || 'Acción'}</span>
+                            ${badge}
+                        </div>
+                        <div class="grid grid-cols-1 gap-2">
+                            <input type="text" id="ai-edit-proj-${idx}" value="${projName}" placeholder="Cliente / Ficha"
+                                class="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                            <input type="text" id="ai-edit-text-${idx}" value="${(act.text || '').replace(/"/g, '&quot;')}" placeholder="Descripción de tarea o recordatorio"
+                                class="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            modal.innerHTML = `
+                <div class="w-full max-w-md bg-[#121417] border border-white/15 rounded-2xl p-4 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
+                    <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                        <div>
+                            <h3 class="text-sm font-bold text-white">Confirmar Análisis de IA</h3>
+                            <p class="text-xs text-gray-400">${result.reply || 'Revisa o edita antes de guardar en tu tablero'}</p>
+                        </div>
+                        <button onclick="closeAiReviewModal()" class="text-gray-400 hover:text-white text-lg px-2">&times;</button>
+                    </div>
+                    <div class="space-y-2.5 overflow-y-auto pr-1 flex-1">
+                        ${actionsHtml || '<p class="text-xs text-gray-400 text-center py-4">No se detectaron tareas nuevas.</p>'}
+                    </div>
+                    <div class="flex gap-2 pt-2 border-t border-white/10">
+                        <button onclick="closeAiReviewModal()" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-300">Cancelar</button>
+                        <button onclick="confirmAiReviewModal()" class="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-black">Aceptar y Guardar</button>
+                    </div>
+                </div>
+            `;
+            modal.classList.remove('hidden');
+        }
+
+        window.closeAiReviewModal = () => {
+            const modal = document.getElementById('ai-review-modal');
+            if (modal) modal.classList.add('hidden');
+            pendingAiResult = null;
+        };
+
+        window.confirmAiReviewModal = () => {
+            if (!pendingAiResult || !pendingAiResult.actions) return;
+            pendingAiResult.actions.forEach((act, idx) => {
+                const projInput = document.getElementById(`ai-edit-proj-${idx}`);
+                const textInput = document.getElementById(`ai-edit-text-${idx}`);
+                if (projInput) act.projectName = projInput.value.trim();
+                if (textInput) act.text = textInput.value.trim();
+            });
+            const count = applyAiActions(pendingAiResult);
+            closeAiReviewModal();
+            if (typeof renderAll === 'function') renderAll();
+        };
+
+        async function callGeminiAgent(userText, imageBase64 = null, mimeType = null) {
+            const apiKey = localStorage.getItem('daotto_gemini_key');
+            if (!apiKey) {
+                openApiKeyModal();
+                throw new Error("Falta configurar tu Gemini API Key.");
+            }
+
+            const existingProjects = appData.projects.map(p => ({
+                nombre: p.name,
+                estado: p.status,
+                tareasPendientes: (p.tasks || []).filter(t => !t.done).map(t => t.text)
+            }));
+
+            const systemPrompt = `Eres el motor de inteligencia de DaottoOS para Frank (Director Creativo de Hiuga / Daotto Design).
+Proyectos y tareas actuales en el tablero: ${JSON.stringify(existingProjects)}.
+
+Devuelve ÚNICAMENTE un objeto JSON válido (sin markdown, sin bloques de código):
+{
+  "reply": "Resumen corto de lo detectado para mostrar en el panel de confirmación",
+  "actions": [
+    {
+      "type": "add_task",
+      "projectName": "Nombre exacto del cliente existente si coincide (ej. Peluzzia, Veli Vita, Señor Emiro, Ciudad Café) o nuevo cliente",
+      "category": "enfoque",
+      "text": "Descripción clara de la tarea",
+      "priority": "Alta|Media|Baja"
+    },
+    {
+      "type": "complete_task",
+      "projectName": "Nombre del cliente existente",
+      "text": "Texto aproximado de la tarea que el usuario indicó que ya está lista"
+    },
+    {
+      "type": "add_reminder",
+      "projectName": "Cliente asociado",
+      "text": "Cliente: Recordatorio accionable con fecha/hora si se menciona",
+      "dueWhen": "Hoy|Mañana|Lunes|Martes|Miércoles|Jueves|Viernes",
+      "priority": "Alta|Media"
+    }
+  ]
+}
+
+Reglas críticas:
+1. Si el usuario menciona avance de un proyecto (ej. "tengo lo de pelusia ya está listo la semana 2 y necesito solicitar la tercera semana"), genera:
+   - Una acción "complete_task" para marcar la semana 2 como lista en Peluzzia.
+   - Una acción "add_task" para "Solicitar tercera semana" en Peluzzia.
+   - Una acción "add_reminder" para recordar dar seguimiento a la tercera semana de Peluzzia.
+2. Corrige errores ortográficos de dictado por voz en nombres de clientes (ej. "pelusia" -> "Peluzzia", "beli bita" -> "Veli Vita").
+3. Si analizas una foto de agenda manuscrita, extrae cada línea como "add_task" o "add_reminder" asociándola al cliente más cercano del tablero.`;
+
+            const parts = [{ text: systemPrompt }];
+            if (userText) parts.push({ text: `Entrada de Frank: ${userText}` });
+            if (imageBase64 && mimeType) {
+                parts.push({ inline_data: { mime_type: mimeType, data: imageBase64 } });
+            }
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts }],
+                    generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
+                })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error?.message || `Error HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+            return JSON.parse(rawText);
+        }
+
+        function applyAiActions(result) {
+            if (!result || !Array.isArray(result.actions)) return 0;
+            let count = 0;
+
+            result.actions.forEach(act => {
+                if (act.type === 'complete_task' && act.projectName) {
+                    const prj = appData.projects.find(p => p.name.toLowerCase().includes(act.projectName.toLowerCase()));
+                    if (prj && Array.isArray(prj.tasks)) {
+                        const target = prj.tasks.find(t => !t.done && t.text.toLowerCase().includes((act.text || '').toLowerCase().slice(0, 12)))
+                                    || prj.tasks.find(t => !t.done);
+                        if (target) {
+                            target.done = true;
+                            count++;
+                        }
+                    }
+                } else if (act.type === 'add_task' && act.text) {
+                    const targetName = (act.projectName || 'General').trim();
+                    let prj = appData.projects.find(p => p.name.toLowerCase() === targetName.toLowerCase());
+                    if (!prj) {
+                        const cat = act.category === 'cola' ? 'cola' : 'enfoque';
+                        prj = {
+                            id: 'p' + Date.now() + Math.floor(Math.random() * 100),
+                            name: targetName,
+                            category: cat,
+                            status: cat === 'enfoque' ? 'Enfoque' : 'En Cola',
+                            statusColor: cat === 'enfoque' ? 'emerald' : 'blue',
+                            brief: 'Ficha creada automáticamente desde análisis IA.',
+                            tasks: []
+                        };
+                        appData.projects.unshift(prj);
+                    }
+                    prj.tasks.unshift({
+                        id: 't' + Date.now() + Math.floor(Math.random() * 100),
+                        text: act.text,
+                        done: false,
+                        priority: act.priority || 'Media',
+                        today: Boolean(act.today)
+                    });
+                    count++;
+                } else if (act.type === 'add_reminder' && act.text) {
+                    appData.reminders.unshift({
+                        id: 'r' + Date.now() + Math.floor(Math.random() * 100),
+                        text: act.text,
+                        done: false,
+                        due: act.dueWhen || 'Hoy',
+                        priority: act.priority || 'Alta'
+                    });
+                    count++;
+                }
+            });
+
+            if (count > 0) saveData();
+            return count;
+        }
 </body>
 </html>
