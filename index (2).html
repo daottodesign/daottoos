@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>DaottoOS | Diseño Inteligente</title>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script src="https://unpkg.com/lucide@0.469.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <style>
+        @supports (font: -apple-system-body) {
+            body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, sans-serif; }
+        }
+        body { background-color: #000000; color: #f5f5f7; -webkit-font-smoothing: antialiased; padding-bottom: env(safe-area-inset-bottom); overflow-x: hidden; }
+        
+        .glass-panel { 
+            background: rgba(28, 28, 30, 0.74); 
+            backdrop-filter: blur(20px) saturate(180%); 
+            -webkit-backdrop-filter: blur(20px) saturate(180%); 
+            border: 1px solid rgba(255, 255, 255, 0.08); 
+        }
+        
+        .dark-card { background: rgba(20, 20, 22, 0.85); border: 1px solid rgba(255, 255, 255, 0.06); }
+        
+        .floating-dock { box-shadow: 0 20px 40px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.08); }
+        .project-card { transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; }
+        .sortable-ghost { opacity: 0.35; transform: scale(0.98); border: 1px dashed #34c759 !important; }
+        .sortable-drag { cursor: grabbing !important; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.95); }
+        
+        .checkbox-custom { appearance: none; width: 20px; height: 20px; border: 1.5px solid #48484a; border-radius: 10px; display: grid; place-content: center; transition: all 0.2s; cursor: pointer; flex-shrink: 0; }
+        .checkbox-custom::before { content: ""; width: 10px; height: 10px; background-color: #fff; transform: scale(0); transition: 150ms transform cubic-bezier(0.4, 0, 0.2, 1); border-radius: 5px; }
+        .checkbox-custom:checked { border-color: #34c759; background-color: #34c759; }
+        .checkbox-custom:checked::before { transform: scale(1); }
+        .task-row:has(input:checked) span.task-label { text-decoration: line-through; color: #8e8e93; }
+        
+        .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.4s cubic-bezier(0,1,0,1); }
+        .accordion-content.open { max-height: 2200px; transition: max-height 0.5s ease-in; }
+        .chevron { transition: transform 0.3s ease; }
+        .chevron.open { transform: rotate(180deg); }
+        
+        ::-webkit-scrollbar { display: none; }
+    .project-card{position:relative}
+        .project-card::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--st,#34c759);z-index:1}
+        .project-card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.18)}
+        .task-row{border-left:3px solid transparent}
+        .task-row[data-p="alta"]{border-left-color:#ff453a}.task-row[data-p="media"]{border-left-color:#ff9f0a}.task-row[data-p="baja"]{border-left-color:#636366}
+        .task-row:hover{background:rgba(255,255,255,.06)}
+    </style>
+</head>
+<body class="min-h-screen flex flex-col pb-32 sm:pb-36 selection:bg-emerald-500/30">
+
+    <!-- Header Minimalista -->
+    <div class="w-full flex justify-center sticky top-0 z-40 bg-black/70 backdrop-blur-xl border-b border-white/5">
+        <header class="w-full max-w-7xl px-4 sm:px-6 py-3.5 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-gray-800 to-black border border-gray-700 flex items-center justify-center shadow-inner shrink-0">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#34c759" stroke-width="2.5" stroke-linejoin="round"/>
+                        <path d="M2 17L12 22L22 17" stroke="white" stroke-width="2.5" stroke-linejoin="round"/>
+                        <path d="M2 12L12 17L22 12" stroke="white" stroke-width="2.5" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="min-w-0">
+                    <h1 class="text-[15px] font-bold tracking-tight text-white truncate">Daotto<span class="text-gray-400 font-normal">OS</span></h1>
+                    <p class="text-[10px] text-emerald-400 font-medium uppercase tracking-widest" id="sync-status">Conectando...</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="openApiKeyModal()" id="api-status-btn" class="px-3.5 py-2 rounded-full bg-gray-900 text-gray-300 border border-gray-700/80 text-[11px] font-semibold flex items-center gap-1.5 hover:bg-gray-800 transition shrink-0">
+                    <span id="api-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    <span id="api-btn-text">Configurar IA</span>
+                </button>
+            </div>
+        </header>
+    </div>
+
+    <!-- Contenedor Principal -->
+    <div class="w-full max-w-7xl mx-auto flex-1 flex flex-col mt-2">
+        
+        <!-- Panel de Control Ejecutivo -->
+        <section class="px-4 sm:px-6 pt-5 pb-3 w-full">
+            <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5">
+                <div>
+                    <h2 class="text-[28px] sm:text-[32px] font-extrabold tracking-tight text-white leading-none">Panel de Control</h2>
+                    <p class="text-[13px] text-gray-400 font-medium mt-1.5" id="current-date">Cargando fecha...</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button id="my-day-toggle" onclick="toggleMyDayFilter()" class="px-3.5 py-1.5 rounded-full bg-gray-900 border border-gray-700 text-gray-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition">
+                        <i data-lucide="sun" class="w-3.5 h-3.5 text-amber-400"></i> Enfoque Hoy
+                    </button>
+                    <div id="day-filter-badge" class="hidden items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-3.5 py-1.5 rounded-full text-xs font-semibold">
+                        <span id="day-filter-label">Filtro activo</span>
+                        <button onclick="clearDayFilter()" class="hover:text-white"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4 KPI Cards Interactivos -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                <button onclick="setFilter('all')" class="glass-panel p-4 rounded-2xl border border-white/10 text-left hover:border-amber-400/40 transition">
+                    <div class="flex items-center justify-between text-gray-400 mb-1.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wider">Pendientes</span>
+                        <i data-lucide="layers" class="w-4 h-4 text-amber-400"></i>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span id="kpi-pending" class="text-2xl sm:text-3xl font-extrabold text-white">0</span>
+                        <span class="text-xs text-gray-500">tareas</span>
+                    </div>
+                </button>
+
+                <div class="glass-panel p-4 rounded-2xl border border-white/10">
+                    <div class="flex items-center justify-between text-gray-400 mb-1.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wider">Completadas</span>
+                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span id="kpi-done" class="text-2xl sm:text-3xl font-extrabold text-emerald-400">0</span>
+                        <span id="kpi-total-label" class="text-xs text-gray-500">de 0</span>
+                    </div>
+                </div>
+
+                <button onclick="setFilter('enfoque')" class="glass-panel p-4 rounded-2xl border border-white/10 text-left hover:border-orange-400/40 transition">
+                    <div class="flex items-center justify-between text-gray-400 mb-1.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wider">En Enfoque</span>
+                        <i data-lucide="flame" class="w-4 h-4 text-orange-400"></i>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span id="kpi-focus" class="text-2xl sm:text-3xl font-extrabold text-white">0</span>
+                        <span class="text-xs text-gray-500">clientes</span>
+                    </div>
+                </button>
+
+                <div class="glass-panel p-4 rounded-2xl border border-white/10">
+                    <div class="flex items-center justify-between text-gray-400 mb-1.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wider">Avance Global</span>
+                        <i data-lucide="trending-up" class="w-4 h-4 text-blue-400"></i>
+                    </div>
+                    <div class="flex items-center gap-3 mt-1">
+                        <span id="kpi-pct" class="text-2xl sm:text-3xl font-extrabold text-white">0%</span>
+                        <div class="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+                            <div id="kpi-pct-bar" class="h-full bg-emerald-500 transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agenda Semanal Real Interactiva + Resumen Directo de Tareas por Día -->
+            <div class="glass-panel p-3.5 sm:p-4 rounded-2xl border border-white/10 space-y-3">
+                <div class="flex items-center justify-between px-1">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                        <i data-lucide="calendar-days" class="w-3.5 h-3.5 text-emerald-400"></i> Pendientes por Día de la Semana
+                    </span>
+                    <span id="week-pending-summary" class="text-[11px] text-gray-400 font-medium">0 agendados</span>
+                </div>
+                <div class="grid grid-cols-7 gap-1.5 sm:gap-2.5" id="weekly-schedule-bar"></div>
+                
+                <!-- Resumen visual inmediato de las tareas agendadas en la semana (Sábado, Lunes, Hoy, etc.) -->
+                <div id="weekly-tasks-digest" class="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-2 border-t border-white/5"></div>
+            </div>
+        </section>
+
+        <!-- Cuerpo Principal: Columna Izquierda (Chat IA + Recordatorios) + Tablero de Clientes -->
+        <div class="flex flex-col lg:flex-row gap-6 px-4 sm:px-6 w-full mt-2">
+            
+            <!-- Columna Izquierda: Chat IA Integrado en Panel Principal + Recordatorios -->
+            <div class="w-full lg:w-[360px] flex flex-col gap-5 shrink-0 lg:sticky lg:top-20 lg:h-[calc(100vh-110px)] lg:overflow-y-auto">
+                
+                <!-- Asistente Chat IA Directo en el Panel Principal -->
+                <section class="w-full">
+                    <div class="glass-panel p-5 rounded-3xl w-full shadow-xl border border-emerald-500/25 flex flex-col">
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <h3 class="text-[13px] font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                                    <i data-lucide="sparkles" class="w-4 h-4 text-emerald-400"></i> Chat IA · DaottoOS
+                                </h3>
+                                <p class="text-[11px] text-gray-400 mt-0.5">Analiza tareas, actualiza estados o dicta órdenes</p>
+                            </div>
+                            <button onclick="clearChatHistory()" title="Limpiar historial de chat" class="text-[10px] text-gray-400 hover:text-white bg-gray-900/80 border border-gray-700/80 px-2.5 py-1 rounded-full transition">Limpiar</button>
+                        </div>
+
+                        <!-- Historial de Conversación -->
+                        <div id="chat-messages" class="space-y-3 max-h-60 min-h-[130px] overflow-y-auto pr-1 text-[12.5px] mb-3.5"></div>
+
+                        <!-- Sugerencias rápidas de análisis -->
+                        <div class="flex gap-1.5 overflow-x-auto pb-2.5 mb-2">
+                            <button onclick="sendQuickPrompt('Analiza mis tareas pendientes y dime qué debo priorizar hoy')" class="text-[10.5px] whitespace-nowrap bg-gray-900/90 hover:bg-gray-800 text-emerald-300 border border-emerald-500/25 px-2.5 py-1 rounded-full transition">📊 Analizar prioridades</button>
+                            <button onclick="sendQuickPrompt('¿Qué clientes están en Enfoque y qué les falta?')" class="text-[10.5px] whitespace-nowrap bg-gray-900/90 hover:bg-gray-800 text-gray-300 border border-gray-700 px-2.5 py-1 rounded-full transition">🔥 Resumen Enfoque</button>
+                        </div>
+
+                        <!-- Barra de Entrada del Chat IA -->
+                        <div class="flex gap-2 w-full items-center pt-2 border-t border-white/10">
+                            <button onclick="triggerAgendaScanner()" title="Analizar foto o captura" class="w-10 h-10 rounded-xl bg-gray-900 border border-gray-700 text-gray-300 hover:text-emerald-400 flex items-center justify-center shrink-0 transition">
+                                <i data-lucide="image-plus" class="w-4 h-4"></i>
+                            </button>
+                            <div class="relative flex-1 min-w-0">
+                                <input type="text" id="chat-input" placeholder="Ej: Peluzzia nueva grilla 3..." onkeydown="if(event.key==='Enter') sendChatMessage()" class="w-full bg-gray-900/90 border border-gray-700 rounded-xl pl-3.5 pr-9 py-2.5 text-[12.5px] text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition shadow-inner">
+                                <button onclick="startDictation('chat-input')" title="Dictar por voz" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-400 transition p-1">
+                                    <i data-lucide="mic" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                            <button id="chat-send-btn" onclick="sendChatMessage()" class="bg-emerald-500 text-black w-10 h-10 rounded-xl flex items-center justify-center shrink-0 hover:bg-emerald-400 active:scale-[0.97] transition shadow-lg font-bold">
+                                <i data-lucide="arrow-up" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Recordatorios Activos -->
+                <section class="w-full">
+                    <div class="glass-panel p-5 rounded-3xl w-full shadow-xl">
+                        <div class="flex justify-between items-center mb-3.5">
+                            <h3 class="text-[12px] font-bold uppercase tracking-wider text-gray-200 flex items-center gap-2">
+                                <i data-lucide="bell-ring" class="w-4 h-4 text-amber-400"></i> Recordatorios
+                            </h3>
+                            <span class="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full" id="reminders-count">0</span>
+                        </div>
+                        <div id="reminders-list" class="space-y-2.5 max-h-60 overflow-y-auto pr-1"></div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Columna Derecha: Tablero Arrastrable de Clientes -->
+            <div class="w-full flex flex-col">
+                <div class="mb-5 sticky top-20 z-30">
+                    <div class="glass-panel p-2 rounded-2xl shadow-lg border-gray-700/50 flex flex-col sm:flex-row gap-2">
+                        <div class="flex bg-gray-900 p-1 rounded-xl flex-1 overflow-x-auto shadow-inner border border-gray-700/50">
+                            <button onclick="setFilter('all')" id="filter-all" class="flex-1 min-w-[60px] px-3 py-2 rounded-lg text-[12px] font-semibold bg-gray-700 text-white shadow transition whitespace-nowrap">Todos</button>
+                            <button onclick="setFilter('enfoque')" id="filter-enfoque" class="flex-1 min-w-[70px] px-3 py-2 rounded-lg text-[12px] font-semibold text-gray-400 hover:text-white transition whitespace-nowrap">Enfoque</button>
+                            <button onclick="setFilter('cola')" id="filter-cola" class="flex-1 min-w-[65px] px-3 py-2 rounded-lg text-[12px] font-semibold text-gray-400 hover:text-white transition whitespace-nowrap">En Cola</button>
+                            <button onclick="setFilter('standby')" id="filter-standby" class="flex-1 min-w-[65px] px-3 py-2 rounded-lg text-[12px] font-semibold text-gray-400 hover:text-white transition whitespace-nowrap">Standby</button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="relative flex-1 sm:w-44">
+                                <i data-lucide="search" class="w-3.5 h-3.5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                                <input type="text" id="board-search" oninput="renderProjects()" placeholder="Buscar cliente/tarea..." class="w-full bg-gray-900 border border-gray-700/80 rounded-xl pl-8 pr-3 py-2 text-[12px] text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500">
+                            </div>
+                            <button onclick="createNewProject()" title="Nuevo Cliente" class="p-2.5 bg-emerald-500 text-black rounded-xl flex-shrink-0 hover:bg-emerald-400 transition shadow-lg active:scale-[0.98]">
+                                <i data-lucide="plus" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-gray-500 mt-2 px-1 flex items-center gap-1.5">
+                        <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i> Arrastra las tarjetas desde el ícono lateral para reordenar prioridades.
+                    </p>
+                </div>
+
+                <main class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 w-full pb-12" id="projects-container"></main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input oculto para subir o tomar foto de la libreta/agenda -->
+    <input type="file" id="agenda-photo-input" accept="image/*" capture="environment" class="hidden" onchange="handleAgendaPhotoUpload(event)">
+
+    <!-- Dock Flotante Inferior Limpio -->
+    <div class="fixed bottom-5 sm:bottom-7 w-full flex justify-center z-40 px-4 pointer-events-none">
+        <nav class="glass-panel floating-dock rounded-full px-8 py-3.5 flex gap-10 items-center w-full max-w-xs justify-between pointer-events-auto shadow-2xl border border-white/15">
+            <button onclick="window.scrollTo({top: 0, behavior: 'smooth'}); clearDayFilter();" class="flex flex-col items-center gap-1 text-white hover:scale-105 transition-transform">
+                <i data-lucide="layout-grid" class="w-5 h-5"></i>
+                <span class="text-[10px] font-semibold">Inicio</span>
+            </button>
+            
+            <button onclick="triggerAgendaScanner()" title="Escanear foto de libreta o captura" class="relative flex items-center justify-center -mt-11 hover:scale-105 transition-transform group">
+                <div class="bg-gradient-to-b from-emerald-400 to-emerald-600 text-black rounded-full shadow-2xl border-2 border-black/40 flex items-center justify-center w-16 h-16">
+                    <i data-lucide="camera" class="w-7 h-7 stroke-[2]"></i>
+                </div>
+                <span class="absolute -bottom-5 text-[10px] font-bold text-emerald-400 whitespace-nowrap">Agenda</span>
+            </button>
+            
+            <button onclick="createNewProject()" class="flex flex-col items-center gap-1 text-gray-300 hover:text-emerald-400 hover:scale-105 transition-transform">
+                <i data-lucide="folder-plus" class="w-5 h-5"></i>
+                <span class="text-[10px] font-semibold">Cliente</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Pantalla de Carga IA -->
+    <div id="ai-loading-overlay" class="fixed inset-0 z-[115] bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
+        <div class="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mb-3"></div>
+        <p class="text-sm font-semibold text-white" id="ai-loading-title">Analizando con Daotto IA...</p>
+        <p class="text-xs text-gray-400 mt-1">Sincronizando proyectos, tareas y recordatorios</p>
+    </div>
+
+    <!-- Modal de Confirmación de Acciones IA -->
+    <div id="ai-review-modal" class="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md hidden items-end sm:items-center justify-center p-4">
+        <div class="w-full max-w-md bg-[#121417] border border-white/15 rounded-2xl p-4 space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                <div>
+                    <h3 class="text-sm font-bold text-white">Confirmar Cambios en Tablero</h3>
+                    <p class="text-xs text-gray-400" id="ai-modal-subtitle">Revisa o edita antes de aplicar</p>
+                </div>
+                <button onclick="closeAiReviewModal()" class="text-gray-400 hover:text-white text-lg px-2">&times;</button>
+            </div>
+            <div id="modal-actions-list" class="space-y-2.5 overflow-y-auto pr-1 flex-1 text-xs text-gray-300"></div>
+            <div class="flex gap-2 pt-2 border-t border-white/10">
+                <button onclick="closeAiReviewModal()" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-gray-300 transition">Cancelar</button>
+                <button onclick="confirmAiReviewModal()" class="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-xs font-bold text-black transition">Aceptar y Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Configuración API Key de Gemini -->
+    <div id="modal-apikey" class="hidden fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center px-4">
+        <div class="glass-panel p-7 rounded-[28px] w-full max-w-md shadow-2xl border border-white/10">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-[19px] font-bold text-white flex items-center gap-2">
+                    <i data-lucide="key-round" class="w-5 h-5 text-emerald-400"></i> Conectar Gemini API
+                </h3>
+                <button onclick="closeModal('modal-apikey')" class="text-gray-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <p class="text-[13px] text-gray-300 mb-4 leading-relaxed">
+                Pega tu API Key de Google AI Studio. Se guarda únicamente en tu navegador (<code class="text-emerald-400">localStorage</code>) para activar el Chat IA y el escáner de fotos sin exponerla en GitHub.
+            </p>
+            <input type="password" id="gemini-api-key-input" placeholder="AIzaSy..." class="w-full bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3.5 text-[13px] text-white mb-4 focus:outline-none focus:border-emerald-500">
+            <div class="flex gap-2.5">
+                <button onclick="saveGeminiApiKey()" class="flex-1 bg-emerald-500 text-black font-bold py-3.5 rounded-2xl text-[14px] hover:bg-emerald-400 transition">Guardar Clave</button>
+                <button onclick="closeModal('modal-apikey')" class="px-5 bg-gray-800 text-gray-300 font-semibold py-3.5 rounded-2xl text-[14px]">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dateOpts = { weekday: 'long', day: 'numeric', month: 'long' };
+        document.getElementById('current-date').innerText = new Date().toLocaleDateString('es-ES', dateOpts).replace(/^\w/, c => c.toUpperCase());
+        lucide.createIcons();
+        
+        let currentFilter = 'all';
+        let selectedDayFilter = null;
+        let onlyTodayTasks = false;
+        let sortableInstance = null;
+        let pendingAiResult = null;
+        let cachedAvailableModels = null;
+
+        const firebaseConfig = { 
+            databaseURL: "https://daotto-327c2-default-rtdb.firebaseio.com/"
+        };
+        
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
+        db.ref('.info/connected').on('value', (snap) => {
+            const statusEl = document.getElementById('sync-status');
+            if (snap.val() === true) {
+                statusEl.innerText = "ONLINE (CLOUD)";
+                statusEl.className = "text-[10px] text-emerald-400 font-medium uppercase tracking-widest";
+            } else {
+                statusEl.innerText = "SINCRONIZANDO...";
+                statusEl.className = "text-[10px] text-amber-400 font-medium uppercase tracking-widest";
+            }
+        });
+
+        let appData = {
+            projects: [
+                { id: 'p1', name: 'Veli Vita', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Branding integral, moodboard, propuesta gráfica y cotización.', tasks: [{ id: 't1_1', text: 'Armar Moodboard y propuesta', done: false, priority: 'alta', today: true }] },
+                { id: 'p2', name: 'Peluzzia', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Identidad cercana, carruseles educativos y Grilla Dos.', tasks: [{ id: 't2_1', text: 'Finalizar Grilla Dos', done: false, priority: 'alta', today: true }] },
+                { id: 'p3', name: 'Señor Emiro', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Logotipo clásico, tipografía y guía de estilo.', tasks: [{ id: 't3_1', text: 'Montar fotografía en logo', done: false, priority: 'media', today: true }] },
+                { id: 'p4', name: 'Ciudad Café', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Gestión de cartas, promociones y material P.O.P.', tasks: [{ id: 't4_1', text: 'Terminar diseños de promos y cartas', done: false, priority: 'alta', today: true }] },
+                { id: 'p5', name: 'FastWay', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Edición logística y de Reels.', tasks: [{ id: 't5_1', text: 'Edición de Reels', done: false, priority: 'media', today: false }] },
+                { id: 'p6', name: 'Natoura', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Diseño comercial de valla, fachada y ads.', tasks: [{ id: 't6_1', text: 'Diseño de fachada', done: false, priority: 'baja', today: false }] },
+                { id: 'p7', name: 'Labomed', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Tríptico, pendón y lanyard.', tasks: [{ id: 't7_1', text: 'Adelantar lanyard', done: false, priority: 'media', today: false }] },
+                { id: 'p8', name: 'Puyaos', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Diseño de etiqueta de café.', tasks: [{ id: 't8_1', text: 'Finalizar etiqueta de café', done: false, priority: 'media', today: false }] },
+                { id: 'p9', name: 'Cafetero VE', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Doypack, empaque y planimetría.', tasks: [{ id: 't9_1', text: 'Revisión de empaque con cliente', done: false, priority: 'baja', today: false }] }
+            ],
+            reminders: [],
+            chatLogs: []
+        };
+
+        /*HELPERS*/
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+        const isoDate = d => { const x = new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; };
+        const DAYS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+        function lev(a, b) { const m = a.length, n = b.length; let p = Array.from({length: n+1}, (_, j) => j); for (let i = 1; i <= m; i++) { const c = [i]; for (let j = 1; j <= n; j++) c[j] = Math.min(p[j]+1, c[j-1]+1, p[j-1] + (a[i-1] === b[j-1] ? 0 : 1)); p = c; } return p[n]; }
+        function matchProject(projects, name) {
+            const n = norm(name); if (!n) return null; let best = null, score = 0;
+            for (const p of projects) { const pn = norm(p.name); let sc = 0;
+                if (pn === n) sc = 100; else if (pn && (pn.includes(n) || n.includes(pn))) sc = 80;
+                else { const r = 1 - lev(pn, n) / Math.max(pn.length, n.length, 1); if (r >= 0.7) sc = r * 70; }
+                if (sc > score) { score = sc; best = p; } }
+            return best;
+        }
+        function parseAiJson(raw) {
+            const t = String(raw || '').replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+            try { return JSON.parse(t); } catch (e) {}
+            const a = t.indexOf('{'), b = t.lastIndexOf('}');
+            if (a >= 0 && b > a) return JSON.parse(t.slice(a, b + 1));
+            throw new Error('La IA no devolvió un JSON válido');
+        }
+        function normalizeData(d) {
+            const arr = v => Array.isArray(v) ? v.filter(Boolean) : Object.values(v || {});
+            const out = { projects: arr(d.projects), reminders: arr(d.reminders), chatLogs: arr(d.chatLogs) };
+            out.projects.forEach(p => { p.tasks = arr(p.tasks); });
+            return out;
+        }
+        function weekdayISO(dayFull) { const now = new Date(); const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7)); mon.setDate(mon.getDate() + ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].indexOf(dayFull)); return isoDate(mon); }
+        function remDayName(r) { if (r.dueDate) { const d = new Date(r.dueDate + 'T12:00:00'); return isoDate(d) === isoDate(new Date()) ? 'Hoy' : DAYS[d.getDay()]; } return r.date || 'Hoy'; }
+        function remMatchesDay(r, dayFull) {
+            if (r.dueDate) return r.dueDate === weekdayISO(dayFull);
+            const d = norm(r.date);
+            if (dayFull === DAYS[new Date().getDay()] && (d.includes('hoy') || d.includes('revisar'))) return true;
+            return d.includes(norm(dayFull));
+        }
+        const isTodayTask = t => t.today || (t.due && t.due <= isoDate(new Date()));
+        function dueChip(t) {
+            if (!t.due) return ''; const td = isoDate(new Date());
+            const cls = t.due < td && !t.done ? 'bg-red-500/20 text-red-300 border-red-500/40' : t.due === td ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-gray-800/60 text-gray-400 border-gray-700/50';
+            const [, m, d] = t.due.split('-'); return `<span class="text-[9px] font-semibold px-1.5 py-0.5 rounded border ${cls}">${d}/${m}</span>`;
+        }
+        function captureModalEdits() {
+            if (!pendingAiResult || !pendingAiResult.actions) return;
+            pendingAiResult.actions.forEach((act, idx) => {
+                const p = document.getElementById(`ai-edit-proj-${idx}`), t = document.getElementById(`ai-edit-text-${idx}`);
+                if (p) act.projectName = p.value.trim(); if (t) act.text = t.value.trim();
+            });
+        }
+        function compressImage(dataUrl, mime) {
+            return new Promise(res => { const img = new Image();
+                img.onload = () => { const k = Math.min(1, 1600 / Math.max(img.width, img.height)); const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); res({ data: c.toDataURL('image/jpeg', 0.82).split(',')[1], mime: 'image/jpeg' }); };
+                img.onerror = () => res({ data: dataUrl.split(',')[1], mime: mime || 'image/jpeg' });
+                img.src = dataUrl; });
+        }
+        /*END_HELPERS*/
+
+        function showLoading(show, title = "Analizando con Daotto IA...") {
+            const loader = document.getElementById('ai-loading-overlay');
+            const titleEl = document.getElementById('ai-loading-title');
+            if (titleEl) titleEl.innerText = title;
+            if (loader) {
+                if (show) {
+                    loader.classList.remove('hidden');
+                    loader.classList.add('flex');
+                } else {
+                    loader.classList.add('hidden');
+                    loader.classList.remove('flex');
+                }
+            }
+        }
+
+        function updateApiKeyIndicator() {
+            const key = localStorage.getItem('daotto_gemini_key');
+            const dot = document.getElementById('api-dot');
+            const txt = document.getElementById('api-btn-text');
+            if (key && key.trim().length > 10) {
+                dot.className = "w-2 h-2 rounded-full bg-emerald-400";
+                txt.innerText = "IA Activa";
+            } else {
+                dot.className = "w-2 h-2 rounded-full bg-amber-400 animate-pulse";
+                txt.innerText = "Configurar IA";
+            }
+        }
+
+        window.openApiKeyModal = () => {
+            document.getElementById('gemini-api-key-input').value = localStorage.getItem('daotto_gemini_key') || '';
+            document.getElementById('modal-apikey').classList.remove('hidden');
+        };
+
+        window.saveGeminiApiKey = () => {
+            const val = document.getElementById('gemini-api-key-input').value.trim();
+            cachedAvailableModels = null;
+            if (val) {
+                localStorage.setItem('daotto_gemini_key', val);
+            } else {
+                localStorage.removeItem('daotto_gemini_key');
+            }
+            updateApiKeyIndicator();
+            closeModal('modal-apikey');
+        };
+
+        const CACHE_KEY = 'daotto_cache_v6'; const collapsed = new Set(); let saveTimer = null;
+        function cacheLocal() { try { localStorage.setItem(CACHE_KEY, JSON.stringify(appData)); } catch (e) {} }
+        function loadData() {
+            try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); if (c) { Object.assign(appData, normalizeData(c)); updateUI(); } } catch (e) {}
+            db.ref('daotto_data_v6').on('value', (snap) => {
+                const data = snap.val();
+                if (data) { Object.assign(appData, normalizeData(data)); cacheLocal(); updateUI(); }
+                else saveData();
+            }, (err) => {
+                console.error('Firebase:', err);
+                const el = document.getElementById('sync-status');
+                el.innerText = 'SIN ACCESO A LA NUBE (MODO LOCAL)'; el.className = 'text-[10px] text-red-400 font-medium uppercase tracking-widest';
+            });
+        }
+        function saveData() {
+            appData.chatLogs = appData.chatLogs.slice(-60);
+            cacheLocal(); updateUI();
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(() => {
+                db.ref('daotto_data_v6').update({ projects: appData.projects, reminders: appData.reminders, chatLogs: appData.chatLogs })
+                  .catch(e => console.error('Firebase:', e));
+            }, 250);
+        }
+
+
+        const BAD_MODEL = /(tts|image|live|audio|embed|aqa|imagen|veo|robotics|computer|learnlm|gemma|vision|exp|thinking|deep-research)/i;
+        async function getSupportedGeminiModels(apiKey) {
+            if (cachedAvailableModels && cachedAvailableModels.length) return cachedAvailableModels;
+            try {
+                const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': apiKey } });
+                if (res.status === 400 || res.status === 403) throw new Error('API Key inválida o sin permisos. Revísala en "Configurar IA".');
+                if (res.ok) {
+                    const data = await res.json();
+                    const rank = n => n === 'gemini-flash-latest' ? 0 : /^gemini-\d+(\.\d+)?-flash$/.test(n) ? 1 : (/flash/.test(n) && !/lite/.test(n)) ? 2 : /flash-lite/.test(n) ? 3 : /pro/.test(n) ? 4 : 5;
+                    const valid = (data.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+                        .map(m => m.name.replace(/^models\//, '')).filter(n => n.startsWith('gemini') && !BAD_MODEL.test(n))
+                        .sort((a, b) => rank(a) - rank(b) || b.localeCompare(a, undefined, { numeric: true })).slice(0, 4);
+                    if (valid.length) { cachedAvailableModels = valid; return valid; }
+                }
+            } catch (e) { if (/API Key/.test(e.message)) throw e; console.warn('Modelos:', e); }
+            return ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+        }
+
+        async function callGeminiAgent(userText, imageBase64 = null, mimeType = null) {
+            const apiKey = (localStorage.getItem('daotto_gemini_key') || '').trim();
+            if (!apiKey) { openApiKeyModal(); throw new Error('Falta configurar tu Gemini API Key.'); }
+            const today = new Date();
+            const board = appData.projects.map(p => ({ nombre: p.name, estado: p.status, brief: p.brief,
+                pendientes: (p.tasks || []).filter(t => !t.done).map(t => ({ texto: t.text, prioridad: t.priority, vence: t.due || null, hoy: !!t.today })),
+                completadas: (p.tasks || []).filter(t => t.done).length }));
+            const rems = appData.reminders.map(r => ({ texto: r.text, fecha: r.dueDate || r.date || 'Hoy' }));
+            const cal = Array.from({ length: 14 }, (_, i) => { const d = new Date(today); d.setDate(d.getDate() + i); return `${DAYS[d.getDay()]} ${isoDate(d)}`; }).join(', ');
+            const systemPrompt = `Eres el asistente de DaottoOS, una agenda inteligente de proyectos para Frank (Director Creativo de Hiuga Brand Group y fundador de Cospe Café, Boconó, Venezuela). Responde siempre en español, breve y accionable.
+Hoy es ${DAYS[today.getDay()]} ${isoDate(today)}. Próximos días: ${cal}.
+TABLERO: ${JSON.stringify(board)}
+RECORDATORIOS: ${JSON.stringify(rems)}
+Devuelve SOLO JSON: {"reply":"...","actions":[...]}. Acciones posibles:
+- {"type":"add_task","projectName":"cliente","category":"enfoque|cola","text":"tarea clara","priority":"alta|media|baja","due":"YYYY-MM-DD o null","today":true|false}
+- {"type":"complete_task","projectName":"cliente","text":"tarea pendiente existente"}
+- {"type":"add_reminder","projectName":"cliente","text":"Cliente: recordatorio","dueDate":"YYYY-MM-DD","priority":"Alta|Media"}
+Reglas:
+1. Usa el nombre EXACTO de un cliente del tablero y corrige errores de dictado ("pelusia"→Peluzzia, "beli bita"→Veli Vita, "fast way"→FastWay). Crea cliente nuevo solo si claramente es otro.
+2. Si Frank pide una tarea (cliente + acción), genera add_task con texto limpio. Si menciona un día o fecha, calcula due/dueDate con el calendario de arriba y agrega también add_reminder. "today" es true solo si vence hoy.
+3. No dupliques tareas ni recordatorios que ya existen.
+4. Si es una consulta (¿qué priorizo?, ¿cómo va X?), responde con datos reales del tablero y actions=[].
+5. Usa el historial de la conversación para entender referencias como "esa tarea" o "pásala al viernes".`;
+
+            let hist = appData.chatLogs.slice(-10).filter(l => l && typeof l === 'object' && !/^(Error|Configura)/.test(l.text || ''));
+            if (hist.length && hist[hist.length - 1].from === 'user' && hist[hist.length - 1].text === userText) hist.pop();
+            while (hist.length && hist[0].from !== 'user') hist.shift();
+            const contents = hist.map(l => ({ role: l.from === 'user' ? 'user' : 'model', parts: [{ text: String(l.text).slice(0, 1500) }] }));
+            const parts = [{ text: userText || 'Analiza la imagen.' }];
+            if (imageBase64 && mimeType) parts.push({ inlineData: { mimeType, data: imageBase64 } });
+            contents.push({ role: 'user', parts });
+            const body = JSON.stringify({ systemInstruction: { parts: [{ text: systemPrompt }] }, contents, generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } });
+
+            const models = await getSupportedGeminiModels(apiKey);
+            let lastError = null;
+            for (const model of models) {
+                const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 40000);
+                try {
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body, signal: ctrl.signal });
+                    if (!res.ok) {
+                        const e = await res.json().catch(() => ({})); const msg = e?.error?.message || `Error HTTP ${res.status}`;
+                        lastError = new Error(msg);
+                        if (res.status === 401 || res.status === 403 || (res.status === 400 && /api key/i.test(msg))) { lastError.fatal = true; throw lastError; }
+                        continue;
+                    }
+                    const data = await res.json();
+                    const txt = (data.candidates?.[0]?.content?.parts || []).filter(p => p.text && !p.thought).map(p => p.text).join('');
+                    if (!txt) { lastError = new Error(data.promptFeedback?.blockReason ? `Gemini bloqueó la solicitud (${data.promptFeedback.blockReason}).` : 'Respuesta vacía de Gemini.'); continue; }
+                    const out = parseAiJson(txt); if (!Array.isArray(out.actions)) out.actions = [];
+                    return out;
+                } catch (err) {
+                    if (err.fatal) throw err;
+                    lastError = err.name === 'AbortError' ? new Error('Gemini tardó demasiado en responder.') : err;
+                } finally { clearTimeout(to); }
+            }
+            throw lastError || new Error('No se pudo conectar con ningún modelo de Gemini.');
+        }
+
+        function openAiReviewModal(result) {
+            pendingAiResult = result;
+            const modal = document.getElementById('ai-review-modal');
+            const list = document.getElementById('modal-actions-list');
+            const subtitle = document.getElementById('ai-modal-subtitle');
+            if (subtitle) subtitle.innerText = result.reply || 'Revisa o edita antes de guardar en tu tarjeta de cliente';
+
+            const existingNames = appData.projects.map(p => p.name.toLowerCase().trim());
+            const typeLabels = {
+                'add_task': 'Nueva Tarea en Ficha',
+                'complete_task': 'Completar Tarea',
+                'add_reminder': 'Recordatorio Semanal'
+            };
+
+            if (!result.actions || result.actions.length === 0) {
+                list.innerHTML = `<p class="text-xs text-gray-400 text-center py-4">No se detectaron cambios nuevos para aplicar.</p>`;
+            } else {
+                list.innerHTML = result.actions.map((act, idx) => {
+                    const projName = (act.projectName || 'General').trim();
+                    const exists = existingNames.includes(projName.toLowerCase());
+                    const badge = exists
+                        ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Tarjeta existente</span>`
+                        : `<span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">+ Nueva tarjeta</span>`;
+
+                    return `
+                        <div class="p-3 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-semibold text-emerald-400">${typeLabels[act.type] || 'Acción'}</span>
+                                    ${badge}
+                                </div>
+                                <button onclick="removePendingAction(${idx})" class="text-red-400 hover:text-red-300 text-[11px] font-medium">Descartar</button>
+                            </div>
+                            <div class="grid grid-cols-1 gap-2">
+                                <input type="text" id="ai-edit-proj-${idx}" value="${esc(projName)}" placeholder="Cliente / Ficha"
+                                    class="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                                <input type="text" id="ai-edit-text-${idx}" value="${esc(act.text)}" placeholder="Descripción de tarea o recordatorio"
+                                    class="w-full bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        window.removePendingAction = (idx) => {
+            if (!pendingAiResult || !pendingAiResult.actions) return;
+            captureModalEdits(); pendingAiResult.actions.splice(idx, 1);
+            openAiReviewModal(pendingAiResult);
+        };
+
+        window.closeAiReviewModal = () => {
+            const modal = document.getElementById('ai-review-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            pendingAiResult = null;
+        };
+
+        window.confirmAiReviewModal = () => {
+            if (!pendingAiResult || !pendingAiResult.actions) {
+                closeAiReviewModal();
+                return;
+            }
+            pendingAiResult.actions.forEach((act, idx) => {
+                const projInput = document.getElementById(`ai-edit-proj-${idx}`);
+                const textInput = document.getElementById(`ai-edit-text-${idx}`);
+                if (projInput) act.projectName = projInput.value.trim();
+                if (textInput) act.text = textInput.value.trim();
+            });
+            applyAiActions(pendingAiResult);
+            closeAiReviewModal();
+        };
+
+        function applyAiActions(result) {
+            if (!result || !Array.isArray(result.actions)) return 0;
+            let count = 0; const stamp = () => Date.now() + '_' + Math.floor(Math.random() * 100000);
+            const validISO = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : null;
+            const ensureProject = (name, cat) => {
+                let prj = matchProject(appData.projects, name || 'General');
+                if (!prj) { const c = cat === 'cola' ? 'cola' : 'enfoque';
+                    prj = { id: 'p_' + stamp(), name: (name || 'General').trim(), category: c, status: c === 'enfoque' ? 'Enfoque' : 'En Cola', statusColor: c === 'enfoque' ? 'bg-emerald-500' : 'bg-blue-500', brief: 'Ficha creada automáticamente desde Chat IA.', tasks: [] };
+                    appData.projects.unshift(prj); }
+                prj.tasks = prj.tasks || []; return prj;
+            };
+            result.actions.forEach(act => {
+                if (act.type === 'complete_task' && act.projectName) {
+                    const prj = matchProject(appData.projects, act.projectName); const q = norm(act.text);
+                    const target = prj && q ? (prj.tasks || []).find(t => !t.done && (norm(t.text).includes(q) || q.includes(norm(t.text)))) : null;
+                    if (target) { target.done = true; count++; }
+                } else if (act.type === 'add_task' && act.text) {
+                    const prj = ensureProject(act.projectName, act.category);
+                    if (prj.tasks.some(t => !t.done && norm(t.text) === norm(act.text))) return;
+                    const due = validISO(act.due);
+                    prj.tasks.unshift({ id: 't_' + stamp(), text: act.text, done: false, priority: (act.priority || 'media').toLowerCase(), today: act.today !== undefined ? Boolean(act.today) : due === isoDate(new Date()), due });
+                    count++;
+                } else if (act.type === 'add_reminder' && act.text) {
+                    const prj = act.projectName ? matchProject(appData.projects, act.projectName) : null; const dueDate = validISO(act.dueDate);
+                    if (appData.reminders.some(r => norm(r.text) === norm(act.text) && (r.dueDate || null) === dueDate)) return;
+                    appData.reminders.unshift({ id: 'r_' + stamp(), text: act.text, date: dueDate ? remDayName({ dueDate }) : (act.dueWhen || 'Hoy'), dueDate, projectId: prj ? prj.id : null, priority: act.priority || 'Alta' });
+                    count++;
+                }
+            });
+            if (count > 0) saveData();
+            return count;
+        }
+
+
+        window.triggerAgendaScanner = () => {
+            const apiKey = localStorage.getItem('daotto_gemini_key');
+            if (!apiKey) {
+                openApiKeyModal();
+                return;
+            }
+            document.getElementById('agenda-photo-input').click();
+        };
+
+        window.handleAgendaPhotoUpload = (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+
+            showLoading(true, "Analizando imagen con Daotto IA...");
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const dataUrl = e.target.result;
+                const small = await compressImage(dataUrl, file.type); const base64Data = small.data; const mimeType = small.mime;
+
+                try {
+                    const aiResult = await callGeminiAgent(
+                        "Lee esta imagen (agenda manuscrita, chat o nota). Extrae todas las tareas pendientes, proyectos de clientes y recordatorios con fecha.",
+                        base64Data,
+                        mimeType
+                    );
+                    showLoading(false);
+                    appData.chatLogs.push({ from: 'user', text: '📸 [Imagen enviada para análisis]' });
+                    appData.chatLogs.push({ from: 'ai', text: aiResult.reply || 'He analizado tu imagen.' });
+                    saveData();
+
+                    if (aiResult.actions && aiResult.actions.length > 0) {
+                        openAiReviewModal(aiResult);
+                    }
+                } catch (err) {
+                    showLoading(false);
+                    appData.chatLogs.push({ from: 'ai', text: `Error al analizar imagen: ${err.message}` });
+                    saveData();
+                } finally {
+                    event.target.value = '';
+                }
+            };
+            reader.readAsDataURL(file);
+        };
+
+        window.sendQuickPrompt = (promptText) => {
+            const input = document.getElementById('chat-input');
+            if (input) {
+                input.value = promptText;
+                sendChatMessage();
+            }
+        };
+
+        window.clearChatHistory = () => {
+            appData.chatLogs = [];
+            saveData();
+        };
+
+        window.sendChatMessage = async () => {
+            const input = document.getElementById('chat-input');
+            const sendBtn = document.getElementById('chat-send-btn');
+            const text = input.value.trim();
+            if (!text || window.__sending) return; window.__sending = true;
+            
+            appData.chatLogs.push({ from: 'user', text });
+            input.value = '';
+            renderChatLogs();
+
+            const apiKey = localStorage.getItem('daotto_gemini_key');
+            if (!apiKey) {
+                appData.chatLogs.push({ from: 'ai', text: 'Configura primero tu clave en el botón superior "Configurar IA" para analizar tus tareas.' });
+                saveData(); window.__sending = false;
+                return;
+            }
+
+            sendBtn.disabled = true;
+            showLoading(true, "Procesando con Daotto IA...");
+            try {
+                const aiResult = await callGeminiAgent(text);
+                showLoading(false);
+                appData.chatLogs.push({ from: 'ai', text: aiResult.reply || 'Análisis completado.' });
+                saveData();
+
+                if (aiResult.actions && aiResult.actions.length > 0) {
+                    openAiReviewModal(aiResult);
+                }
+            } catch (err) {
+                showLoading(false);
+                appData.chatLogs.push({ from: 'ai', text: `Error IA: ${err.message}` });
+                saveData();
+            } finally {
+                sendBtn.disabled = false; window.__sending = false;
+            }
+        };
+
+        function startDictation(inputId) {
+            if (window.hasOwnProperty('webkitSpeechRecognition') || window.hasOwnProperty('SpeechRecognition')) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                const recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = "es-ES";
+                
+                const inputEl = document.getElementById(inputId);
+                const originalPlaceholder = inputEl.placeholder;
+                inputEl.placeholder = "Escuchando voz...";
+                
+                recognition.start();
+                
+                recognition.onresult = function(e) {
+                    inputEl.value += (inputEl.value ? " " : "") + e.results[0][0].transcript;
+                    inputEl.placeholder = originalPlaceholder;
+                    recognition.stop();
+                };
+                recognition.onerror = function() {
+                    inputEl.placeholder = originalPlaceholder;
+                    recognition.stop();
+                };
+            } else {
+                alert("Tu navegador no soporta dictado por voz. Usa Chrome o Safari.");
+            }
+        }
+
+        function updateUI() {
+            const drafts = {}; document.querySelectorAll('[id^="new-task-"]').forEach(i => { if (i.value) drafts[i.id] = i.value; });
+            const focusId = document.activeElement && document.activeElement.id;
+            renderKPIs(); renderWeeklySchedule(); renderReminders(); renderProjects(); renderChatLogs();
+            Object.entries(drafts).forEach(([id, v]) => { const el = document.getElementById(id); if (el) el.value = v; });
+            if (focusId && /^new-task-/.test(focusId)) document.getElementById(focusId)?.focus();
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function renderKPIs() {
+            let totalTasks = 0;
+            let doneTasks = 0;
+            let focusProjects = 0;
+
+            appData.projects.forEach(p => {
+                if (p.category === 'enfoque') focusProjects++;
+                const tasks = p.tasks || [];
+                totalTasks += tasks.length;
+                doneTasks += tasks.filter(t => t.done).length;
+            });
+
+            const pendingTasks = totalTasks - doneTasks;
+            const pct = totalTasks === 0 ? 0 : Math.round((doneTasks / totalTasks) * 100);
+
+            document.getElementById('kpi-pending').innerText = pendingTasks;
+            document.getElementById('kpi-done').innerText = doneTasks;
+            document.getElementById('kpi-total-label').innerText = `de ${totalTasks}`;
+            document.getElementById('kpi-focus').innerText = focusProjects;
+            document.getElementById('kpi-pct').innerText = `${pct}%`;
+            document.getElementById('kpi-pct-bar').style.width = `${pct}%`;
+        }
+
+        function renderWeeklySchedule() {
+            const daysConfig = [
+                { d: 'LUN', full: 'Lunes' },
+                { d: 'MAR', full: 'Martes' },
+                { d: 'MIÉ', full: 'Miércoles' },
+                { d: 'JUE', full: 'Jueves' },
+                { d: 'VIE', full: 'Viernes' },
+                { d: 'SÁB', full: 'Sábado' },
+                { d: 'DOM', full: 'Domingo' }
+            ];
+            const container = document.getElementById('weekly-schedule-bar');
+            const digestContainer = document.getElementById('weekly-tasks-digest');
+            const now = new Date();
+            const todayIndex = (now.getDay() + 6) % 7;
+            const monday = new Date(now);
+            monday.setDate(now.getDate() - todayIndex);
+
+            document.getElementById('week-pending-summary').innerText = `${appData.reminders.length} agendados`;
+
+            const activeDaysWithTasks = [];
+
+            container.innerHTML = daysConfig.map((day, idx) => {
+                const cellDate = new Date(monday);
+                cellDate.setDate(monday.getDate() + idx);
+                const dayNum = cellDate.getDate();
+                const isToday = idx === todayIndex;
+                const isSelected = selectedDayFilter === day.full;
+
+                const remindersForDay = appData.reminders.filter(r => remMatchesDay(r, day.full));
+
+                if (remindersForDay.length > 0) {
+                    activeDaysWithTasks.push({
+                        dayShort: day.d,
+                        dayFull: day.full,
+                        dayNum: dayNum,
+                        isToday: isToday,
+                        items: remindersForDay
+                    });
+                }
+
+                const countForDay = remindersForDay.length;
+
+                return `
+                    <button onclick="toggleDayFilter('${day.full}')" class="flex flex-col items-center justify-between p-2.5 rounded-2xl border transition text-center ${
+                        isSelected
+                            ? 'bg-emerald-500/20 border-emerald-400 text-white shadow-md'
+                            : isToday
+                                ? 'bg-gray-900 border-emerald-500/40 text-white'
+                                : 'bg-black/40 border-white/5 text-gray-400 hover:bg-gray-900/70'
+                    }">
+                        <span class="text-[10px] font-bold tracking-wider ${isToday ? 'text-emerald-400' : ''}">${day.d}</span>
+                        <span class="text-[16px] font-extrabold my-1 ${isToday ? 'text-white' : 'text-gray-200'}">${dayNum}</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            countForDay > 0 ? 'bg-emerald-500 text-black' : 'bg-gray-800/80 text-gray-500'
+                        }">${countForDay}</span>
+                    </button>
+                `;
+            }).join('');
+
+            if (digestContainer) {
+                if (activeDaysWithTasks.length === 0) {
+                    digestContainer.innerHTML = `<p class="text-[11.5px] text-gray-500 italic px-1 md:col-span-2">Sin tareas agendadas en los días de esta semana.</p>`;
+                } else {
+                    digestContainer.innerHTML = activeDaysWithTasks.map(d => `
+                        <div class="dark-card p-3 rounded-2xl border border-white/10 flex items-start gap-3">
+                            <div class="flex flex-col items-center justify-center bg-gray-900 border border-emerald-500/30 rounded-xl px-2.5 py-1.5 shrink-0 min-w-[46px]">
+                                <span class="text-[9px] font-bold text-emerald-400 uppercase">${d.dayShort}</span>
+                                <span class="text-base font-extrabold text-white leading-tight">${d.dayNum}</span>
+                            </div>
+                            <ul class="space-y-1 flex-1 min-w-0">
+                                ${d.items.map(item => `
+                                    <li class="text-[12px] text-gray-200 flex items-start gap-1.5 leading-snug">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0"></span>
+                                        <span class="truncate" title="${esc(item.text)}">${esc(item.text)}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        window.toggleMyDayFilter = () => {
+            onlyTodayTasks = !onlyTodayTasks;
+            const btn = document.getElementById('my-day-toggle');
+            if (onlyTodayTasks) {
+                btn.className = "px-3.5 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-200 text-xs font-semibold flex items-center gap-1.5 transition";
+            } else {
+                btn.className = "px-3.5 py-1.5 rounded-full bg-gray-900 border border-gray-700 text-gray-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition";
+            }
+            renderProjects();
+        };
+
+        window.toggleDayFilter = (dayFull) => {
+            if (selectedDayFilter === dayFull) {
+                clearDayFilter();
+                return;
+            }
+            selectedDayFilter = dayFull;
+            const badge = document.getElementById('day-filter-badge');
+            document.getElementById('day-filter-label').innerText = `Día: ${dayFull}`;
+            badge.classList.remove('hidden');
+            badge.classList.add('flex');
+            renderWeeklySchedule();
+            renderReminders();
+        };
+
+        window.clearDayFilter = () => {
+            selectedDayFilter = null;
+            const badge = document.getElementById('day-filter-badge');
+            badge.classList.add('hidden');
+            badge.classList.remove('flex');
+            renderWeeklySchedule();
+            renderReminders();
+        };
+
+        function renderReminders() {
+            const list = document.getElementById('reminders-list');
+            const todayFull = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][new Date().getDay()];
+
+            const visibleReminders = selectedDayFilter
+                ? appData.reminders.filter(r => remMatchesDay(r, selectedDayFilter))
+                : appData.reminders;
+
+            document.getElementById('reminders-count').innerText = visibleReminders.length;
+            
+            if (visibleReminders.length === 0) {
+                list.innerHTML = `<p class="text-[12.5px] text-gray-500 text-center py-4">${selectedDayFilter ? `Sin pendientes para el ${selectedDayFilter}.` : 'No hay recordatorios pendientes.'}</p>`;
+                return;
+            }
+
+            list.innerHTML = visibleReminders.map((rem) => {
+                const realIdx = appData.reminders.indexOf(rem);
+                return `
+                    <div class="flex items-center justify-between dark-card px-3.5 py-3 rounded-2xl border border-gray-700/50 shadow-inner">
+                        <div class="flex items-center gap-2.5 flex-1 min-w-0 pr-2">
+                            <span class="w-2.5 h-2.5 rounded-full shrink-0 ${rem.priority === 'Alta' ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}"></span>
+                            <span class="text-white text-[12.5px] font-medium truncate" title="${esc(rem.text)}">${esc(rem.text)}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="text-[10px] text-gray-300 font-mono bg-gray-900 px-2 py-0.5 rounded-md border border-gray-800">${esc(remDayName(rem))}</span>
+                            <button onclick="deleteReminder(${realIdx})" title="Completar recordatorio" class="text-gray-500 hover:text-emerald-400 p-1"><i data-lucide="check-circle" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getPriorityBadge(priority) {
+            const p = (priority || 'media').toLowerCase();
+            if (p === 'alta') return `<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">Alta</span>`;
+            if (p === 'baja') return `<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-gray-700/60 text-gray-300">Baja</span>`;
+            return `<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Media</span>`;
+        }
+
+        function renderProjects() {
+            const container = document.getElementById('projects-container');
+            container.innerHTML = '';
+            const searchQuery = (document.getElementById('board-search')?.value || '').trim().toLowerCase();
+            
+            const filtered = appData.projects.filter(p => {
+                const matchesCat = currentFilter === 'all' || p.category === currentFilter;
+                if (!matchesCat) return false;
+                const tasks = p.tasks || [];
+                if (onlyTodayTasks && !tasks.some(t => isTodayTask(t) && !t.done)) return false;
+                if (!searchQuery) return true;
+                const inName = p.name.toLowerCase().includes(searchQuery);
+                const inBrief = (p.brief || '').toLowerCase().includes(searchQuery);
+                const inTasks = tasks.some(t => t.text.toLowerCase().includes(searchQuery));
+                return inName || inBrief || inTasks;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="sm:col-span-2 xl:col-span-3 text-center py-16 glass-panel rounded-3xl"><i data-lucide="clipboard-list" class="w-11 h-11 text-gray-600 mx-auto mb-3"></i><p class="text-gray-500 text-[13.5px]">No hay clientes que coincidan con el filtro.</p></div>`;
+                return;
+            }
+
+            filtered.forEach((proj) => {
+                const allTasks = proj.tasks || [];
+                const rk = { alta: 0, media: 1, baja: 2 }; const visibleTasks = (onlyTodayTasks ? allTasks.filter(isTodayTask) : [...allTasks]).sort((a, b) => (a.done - b.done) || ((rk[a.priority] ?? 1) - (rk[b.priority] ?? 1)) || String(a.due || '9').localeCompare(String(b.due || '9')));
+                const projTotal = allTasks.length;
+                const projDone = allTasks.filter(t => t.done).length;
+                const progressPct = projTotal === 0 ? 0 : Math.round((projDone / projTotal) * 100);
+                const statusColor = proj.statusColor || 'bg-gray-500';
+
+                const card = document.createElement('div');
+                card.className = 'glass-panel rounded-3xl overflow-hidden project-card shadow-xl border border-gray-700/50 h-fit';
+                card.setAttribute('data-project-id', proj.id); card.style.setProperty('--st', { enfoque: '#34c759', cola: '#0a84ff', standby: '#8e8e93' }[proj.category] || '#34c759');
+                card.innerHTML = `
+                    <div class="px-4 py-4 bg-black/25">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-start gap-2 flex-1 min-w-0">
+                                <button class="drag-handle cursor-grab active:cursor-grabbing text-gray-500 hover:text-white pt-1 shrink-0" title="Arrastrar para reordenar">
+                                    <i data-lucide="grip-vertical" class="w-4 h-4"></i>
+                                </button>
+                                <div class="flex-1 min-w-0 cursor-pointer" onclick="toggleAccordion('${proj.id}')">
+                                    <div class="flex items-center justify-between mb-1.5">
+                                        <div class="flex items-center gap-2">
+                                            <span class="w-2 h-2 rounded-full ${statusColor} shrink-0"></span>
+                                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider truncate">${proj.status || 'Activo'}</span>
+                                        </div>
+                                        <button onclick="event.stopPropagation(); changeProjectStatus('${proj.id}')" class="text-[10px] text-gray-400 hover:text-white bg-gray-900/90 border border-gray-700 px-2 py-0.5 rounded-md transition shrink-0">Estado</button>
+                                    </div>
+                                    <h2 class="text-[17px] font-bold text-white tracking-tight truncate">${esc(proj.name)}</h2>
+                                    <p onclick="event.stopPropagation(); editProjectBrief('${proj.id}')" title="Clic para editar brief" class="text-[11.5px] text-gray-400 mt-1 line-clamp-2 hover:text-gray-200 transition cursor-pointer">${esc(proj.brief) || 'Añadir contexto o brief...'}</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-center gap-2 shrink-0">
+                                <button onclick="event.stopPropagation(); triggerReminderForProject('${proj.id}')" title="Crear recordatorio" class="w-8 h-8 rounded-xl bg-gray-900/90 flex items-center justify-center text-gray-400 hover:text-amber-400 transition border border-gray-700">
+                                    <i data-lucide="bell" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button onclick="toggleAccordion('${proj.id}')" class="p-1 text-gray-500 hover:text-white">
+                                    <i data-lucide="chevron-down" id="chevron-${proj.id}" class="w-4 h-4 chevron ${collapsed.has(proj.id) ? '' : 'open'}"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <div class="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden flex">
+                                <div class="h-full ${progressPct === 100 ? 'bg-emerald-500' : 'bg-white'} transition-all duration-500 ease-out" style="width: ${progressPct}%"></div>
+                            </div>
+                            <div class="flex justify-between items-center mt-1">
+                                <span class="text-[11px] text-gray-400 font-mono">${projDone}/${projTotal} tareas</span>
+                                <span class="text-[11px] text-gray-400 font-mono">${progressPct}%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="content-${proj.id}" class="accordion-content ${collapsed.has(proj.id) ? '' : 'open'} bg-black/35 border-t border-gray-700/40">
+                        <div class="px-4 py-3.5 space-y-2.5">
+                            <div class="space-y-2" id="tasks-list-${proj.id}">
+                                ${visibleTasks.length > 0 ? visibleTasks.map((task) => `
+                                    <div data-p="${esc((task.priority || 'media').toLowerCase())}" class="task-row flex items-start justify-between group bg-gray-900/50 p-2.5 rounded-xl border border-gray-800/80">
+                                        <label class="flex items-start gap-2.5 cursor-pointer flex-1 min-w-0 pt-0.5">
+                                            <input type="checkbox" class="checkbox-custom mt-0.5" ${task.done ? 'checked' : ''} onchange="toggleTask('${proj.id}', '${task.id}', this.checked)">
+                                            <div class="flex-1 min-w-0">
+                                                <span class="task-label text-[12.5px] text-gray-200 transition leading-snug break-words block">${esc(task.text)}</span>
+                                                <div class="flex items-center gap-1.5 mt-1">
+                                                    <button type="button" onclick="event.preventDefault(); cycleTaskPriority('${proj.id}', '${task.id}')" title="Cambiar prioridad">${getPriorityBadge(task.priority)}</button>${dueChip(task)}
+                                                    <button type="button" onclick="event.preventDefault(); toggleTaskToday('${proj.id}', '${task.id}')" title="Marcar para Enfoque Hoy" class="text-[9px] font-semibold px-1.5 py-0.5 rounded border transition ${task.today ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-gray-800/60 text-gray-500 border-gray-700/50 hover:text-gray-300'}">Hoy</button>
+                                                </div>
+                                            </div>
+                                        </label>
+                                        <button onclick="deleteTask('${proj.id}', '${task.id}')" class="text-gray-600 hover:text-red-500 p-1 opacity-70 sm:opacity-0 group-hover:opacity-100 transition shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                    </div>
+                                `).join('') : '<p class="text-xs text-gray-600 italic px-1 py-1">Sin tareas pendientes en esta vista.</p>'}
+                            </div>
+                            <div class="pt-2.5 border-t border-gray-800/80 flex gap-2 w-full items-center">
+                                <div class="relative flex-1 min-w-0">
+                                    <input type="text" id="new-task-${proj.id}" placeholder="Nueva tarea..." onkeydown="if(event.key==='Enter') addTask('${proj.id}')" class="w-full bg-gray-900/80 border border-gray-700 rounded-xl pl-3.5 pr-9 py-2 text-[12.5px] text-white focus:outline-none focus:border-emerald-500 transition">
+                                    <button onclick="startDictation('new-task-${proj.id}')" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-400 p-1">
+                                        <i data-lucide="mic" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </div>
+                                <button onclick="addTask('${proj.id}')" class="bg-gray-800 hover:bg-gray-700 text-white p-2.5 rounded-xl transition shrink-0 border border-gray-700">
+                                    <i data-lucide="plus" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            initSortableCards();
+        }
+
+        function initSortableCards() {
+            const container = document.getElementById('projects-container');
+            if (!container || typeof Sortable === 'undefined') return;
+            if (sortableInstance) sortableInstance.destroy();
+
+            sortableInstance = new Sortable(container, {
+                animation: 180,
+                handle: '.drag-handle',
+                ghostClass: 'sortable-ghost',
+                dragClass: 'sortable-drag',
+                onEnd: function () {
+                    const orderedIds = Array.from(container.querySelectorAll('[data-project-id]')).map(el => el.getAttribute('data-project-id'));
+                    const reordered = [];
+                    orderedIds.forEach(id => {
+                        const found = appData.projects.find(p => p.id === id);
+                        if (found) reordered.push(found);
+                    });
+                    appData.projects.forEach(p => {
+                        if (!reordered.some(r => r.id === p.id)) reordered.push(p);
+                    });
+                    appData.projects = reordered;
+                    saveData();
+                }
+            });
+        }
+
+        window.cycleTaskPriority = (projId, taskId) => {
+            const proj = appData.projects.find(p => p.id === projId);
+            const task = proj?.tasks?.find(t => t.id === taskId);
+            if (!task) return;
+            const order = ['baja', 'media', 'alta'];
+            const next = order[(order.indexOf((task.priority || 'media').toLowerCase()) + 1) % order.length];
+            task.priority = next;
+            saveData();
+        };
+
+        window.toggleTaskToday = (projId, taskId) => {
+            const proj = appData.projects.find(p => p.id === projId);
+            const task = proj?.tasks?.find(t => t.id === taskId);
+            if (!task) return;
+            task.today = !task.today;
+            saveData();
+        };
+
+        window.editProjectBrief = (projId) => {
+            const proj = appData.projects.find(p => p.id === projId);
+            if (!proj) return;
+            const updated = prompt(`Contexto / Brief de ${proj.name}:`, proj.brief || '');
+            if (updated !== null) {
+                proj.brief = updated.trim();
+                saveData();
+            }
+        };
+
+        function renderChatLogs() {
+            const list = document.getElementById('chat-messages');
+            if (!list) return;
+            if (!appData.chatLogs || appData.chatLogs.length === 0) {
+                list.innerHTML = `<div class="bg-gray-800/80 p-3.5 rounded-2xl rounded-tl-sm text-gray-200 border border-gray-700/80 w-[92%] shadow-sm">Hola Frank. Pregúntame sobre el estado de tus clientes, dime qué tareas agregar o sube una captura para analizarla.</div>`;
+                return;
+            }
+            const lastMessages = appData.chatLogs.slice(-14);
+            list.innerHTML = lastMessages.map(log => {
+                const isUser = typeof log === 'object' && log.from === 'user';
+                const text = typeof log === 'object' ? log.text : log;
+                return isUser ? 
+                    `<div class="bg-emerald-500/20 text-emerald-100 p-3 rounded-2xl rounded-tr-sm ml-auto w-[88%] border border-emerald-500/30 shadow-sm">${esc(text)}</div>` :
+                    `<div class="bg-gray-800/85 p-3 rounded-2xl rounded-tl-sm text-gray-200 border border-gray-700/80 w-[92%] shadow-sm whitespace-pre-line">${esc(text)}</div>`;
+            }).join('');
+            setTimeout(() => list.scrollTop = list.scrollHeight, 60);
+        }
+
+        window.addTask = function(projId) {
+            const input = document.getElementById(`new-task-${projId}`);
+            const text = input.value.trim();
+            if (!text) return;
+            const proj = appData.projects.find(p => p.id === projId);
+            if (!proj.tasks) proj.tasks = [];
+            proj.tasks.push({ id: 't_' + Date.now(), text, done: false, priority: 'media', today: false });
+            input.value = '';
+            saveData();
+        };
+
+        window.deleteTask = function(projId, taskId) {
+            if (confirm('¿Eliminar esta tarea?')) {
+                const proj = appData.projects.find(p => p.id === projId);
+                proj.tasks = proj.tasks.filter(t => t.id !== taskId);
+                saveData();
+            }
+        };
+
+        window.toggleTask = function(projId, taskId, isChecked) {
+            const proj = appData.projects.find(p => p.id === projId);
+            const task = proj.tasks.find(t => t.id === taskId);
+            task.done = isChecked;
+            saveData();
+        };
+
+        window.createNewProject = function() {
+            const name = prompt("Nombre del nuevo cliente o proyecto:");
+            if (!name || !name.trim()) return;
+            const brief = prompt("Brief o descripción rápida (opcional):") || "Nuevo proyecto activo.";
+            appData.projects.unshift({
+                id: 'p_' + Date.now(),
+                name: name.trim(),
+                category: 'enfoque',
+                status: 'Enfoque',
+                statusColor: 'bg-emerald-500',
+                brief: brief.trim(),
+                tasks: []
+            });
+            saveData();
+        };
+
+        window.changeProjectStatus = function(projId) {
+            const proj = appData.projects.find(p => p.id === projId);
+            const opt = prompt(`Cambiar estado de "${proj.name}":
+1 = Enfoque
+2 = En Cola
+3 = Standby`);
+            if (opt === '1') { proj.category = 'enfoque'; proj.status = 'Enfoque'; proj.statusColor = 'bg-emerald-500'; }
+            else if (opt === '2') { proj.category = 'cola'; proj.status = 'En Cola'; proj.statusColor = 'bg-blue-500'; }
+            else if (opt === '3') { proj.category = 'standby'; proj.status = 'Standby'; proj.statusColor = 'bg-gray-500'; }
+            saveData();
+        };
+
+        window.deleteReminder = function(index) {
+            appData.reminders.splice(index, 1);
+            saveData();
+        };
+
+        window.triggerReminderForProject = function(projId) {
+            const proj = appData.projects.find(p => p.id === projId);
+            const taskText = prompt(`¿Qué recordatorio crear para "${proj.name}"?`, "Avanzar en diseño");
+            if (!taskText) return;
+            const date = prompt("¿Para qué día? (Ej: Hoy, Lunes, Martes, Miércoles, Jueves, Viernes, Sábado)", "Hoy");
+            if (date) {
+                appData.reminders.unshift({ text: `${proj.name}: ${taskText}`, date: date, priority: 'Alta' });
+                saveData();
+            }
+        };
+
+        window.setFilter = function(filter) {
+            currentFilter = filter;
+            ['all', 'enfoque', 'cola', 'standby'].forEach(f => {
+                const btn = document.getElementById(`filter-${f}`);
+                if (!btn) return;
+                if (f === filter) {
+                    btn.classList.remove('text-gray-400', 'hover:text-white');
+                    btn.classList.add('bg-gray-700', 'text-white', 'shadow');
+                } else {
+                    btn.classList.remove('bg-gray-700', 'text-white', 'shadow');
+                    btn.classList.add('text-gray-400', 'hover:text-white');
+                }
+            });
+            renderProjects();
+        };
+
+        window.toggleAccordion = function(id) {
+            const content = document.getElementById(`content-${id}`);
+            const chevron = document.getElementById(`chevron-${id}`);
+            content.classList.toggle('open');
+            chevron.classList.toggle('open'); content.classList.contains('open') ? collapsed.delete(id) : collapsed.add(id);
+        };
+
+        window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
+
+        document.getElementById('current-date').innerText = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        updateApiKeyIndicator();
+        loadData();
+    </script>
+</body>
+</html>
