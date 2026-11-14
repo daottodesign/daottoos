@@ -6,6 +6,7 @@
     <title>DaottoOS | Diseño Inteligente</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     
@@ -13,38 +14,40 @@
         @supports (font: -apple-system-body) {
             body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, sans-serif; }
         }
-        body { background-color: #000000; color: #f5f5f7; -webkit-font-smoothing: antialiased; padding-bottom: env(safe-area-inset-bottom); overflow-x: hidden;}
+        body { background-color: #000000; color: #f5f5f7; -webkit-font-smoothing: antialiased; padding-bottom: env(safe-area-inset-bottom); overflow-x: hidden; }
         
         .glass-panel { 
-            background: rgba(28, 28, 30, 0.7); 
+            background: rgba(28, 28, 30, 0.74); 
             backdrop-filter: blur(20px) saturate(180%); 
             -webkit-backdrop-filter: blur(20px) saturate(180%); 
             border: 1px solid rgba(255, 255, 255, 0.08); 
         }
         
-        .dark-card { background: rgba(20, 20, 22, 0.8); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .dark-card { background: rgba(20, 20, 22, 0.85); border: 1px solid rgba(255, 255, 255, 0.06); }
         
-        .floating-dock { box-shadow: 0 20px 40px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.05); }
-        .project-card { transition: transform 0.2s ease, border-color 0.2s ease; }
+        .floating-dock { box-shadow: 0 20px 40px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.08); }
+        .project-card { transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; }
+        .sortable-ghost { opacity: 0.35; transform: scale(0.98); border: 1px dashed #34c759 !important; }
+        .sortable-drag { cursor: grabbing !important; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.95); }
         
-        .checkbox-custom { appearance: none; width: 22px; height: 22px; border: 1.5px solid #48484a; border-radius: 11px; display: grid; place-content: center; transition: all 0.2s; cursor: pointer; flex-shrink: 0;}
-        .checkbox-custom::before { content: ""; width: 12px; height: 12px; background-color: #fff; transform: scale(0); transition: 150ms transform cubic-bezier(0.4, 0, 0.2, 1); border-radius: 6px;}
+        .checkbox-custom { appearance: none; width: 20px; height: 20px; border: 1.5px solid #48484a; border-radius: 10px; display: grid; place-content: center; transition: all 0.2s; cursor: pointer; flex-shrink: 0; }
+        .checkbox-custom::before { content: ""; width: 10px; height: 10px; background-color: #fff; transform: scale(0); transition: 150ms transform cubic-bezier(0.4, 0, 0.2, 1); border-radius: 5px; }
         .checkbox-custom:checked { border-color: #34c759; background-color: #34c759; }
         .checkbox-custom:checked::before { transform: scale(1); }
         .task-row:has(input:checked) span.task-label { text-decoration: line-through; color: #8e8e93; }
         
-        .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.5s cubic-bezier(0,1,0,1); }
-        .accordion-content.open { max-height: 2000px; transition: max-height 0.6s ease-in; }
+        .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.4s cubic-bezier(0,1,0,1); }
+        .accordion-content.open { max-height: 2200px; transition: max-height 0.5s ease-in; }
         .chevron { transition: transform 0.3s ease; }
         .chevron.open { transform: rotate(180deg); }
         
-        ::-webkit-scrollbar { display: none; } 
+        ::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col pb-32 sm:pb-36 selection:bg-emerald-500/30">
 
-    <!-- Header -->
-    <div class="w-full flex justify-center sticky top-0 z-40 bg-black/60 backdrop-blur-xl border-b border-white/5">
+    <!-- Header Minimalista -->
+    <div class="w-full flex justify-center sticky top-0 z-40 bg-black/70 backdrop-blur-xl border-b border-white/5">
         <header class="w-full max-w-7xl px-4 sm:px-6 py-3.5 flex justify-between items-center">
             <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-gray-800 to-black border border-gray-700 flex items-center justify-center shadow-inner shrink-0">
@@ -59,148 +62,260 @@
                     <p class="text-[10px] text-emerald-400 font-medium uppercase tracking-widest" id="sync-status">Conectando...</p>
                 </div>
             </div>
-            <button onclick="toggleAIChat()" class="px-4 py-2 rounded-full bg-gray-900 text-emerald-400 border border-gray-700 text-[12px] font-semibold flex items-center gap-2 hover:bg-gray-800 transition shrink-0 shadow-md">
-                <i data-lucide="sparkles" class="w-4 h-4"></i> Inbox Gemini
-            </button>
+            <div class="flex items-center gap-2">
+                <button onclick="openApiKeyModal()" id="api-status-btn" class="px-3.5 py-2 rounded-full bg-gray-900 text-gray-300 border border-gray-700/80 text-[11px] font-semibold flex items-center gap-1.5 hover:bg-gray-800 transition shrink-0">
+                    <span id="api-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    <span id="api-btn-text">Configurar IA</span>
+                </button>
+            </div>
         </header>
     </div>
 
     <!-- Contenedor Principal -->
-    <div class="w-full max-w-7xl mx-auto flex-1 flex flex-col w-full mt-2">
+    <div class="w-full max-w-7xl mx-auto flex-1 flex flex-col mt-2">
         
-        <!-- Barra Semanal Interactiva -->
-        <div class="px-4 sm:px-6 py-6 w-full max-w-3xl mx-auto">
-            <div class="mb-5 text-center sm:text-left">
-                <h2 class="text-[32px] font-extrabold tracking-tighter text-white leading-none">Panel de Control</h2>
-                <p class="text-[14px] text-gray-400 font-medium mt-1" id="current-date">Cargando fecha...</p>
-            </div>
-            <div class="grid grid-cols-7 gap-2 sm:gap-3" id="weekly-load-bar"></div>
-        </div>
-
-        <div class="flex flex-col lg:flex-row gap-6 px-4 sm:px-6 w-full">
-            
-            <!-- Columna Izquierda: Captura y Recordatorios -->
-            <div class="w-full lg:w-[320px] flex flex-col gap-6 shrink-0 lg:sticky lg:top-24 lg:h-[calc(100vh-100px)]">
-                
-                <!-- Captura Rápida con Voz -->
-                <section class="w-full">
-                    <div class="glass-panel p-5 rounded-3xl w-full shadow-xl">
-                        <h3 class="text-[12px] font-bold uppercase tracking-wider text-gray-300 mb-4 flex items-center gap-2">
-                            <i data-lucide="zap" class="w-4 h-4 text-emerald-500"></i> Captura Rápida
-                        </h3>
-                        <div class="flex flex-col gap-3 w-full">
-                            <div class="relative w-full">
-                                <input type="text" id="quick-note-input" placeholder="Ej: Nueva v2 Veli Vita..." onkeydown="if(event.key==='Enter') processSmartNote()" class="w-full bg-gray-900/70 border border-gray-700 rounded-2xl pl-5 pr-12 py-3.5 text-[14px] text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition shadow-inner">
-                                <button onclick="startDictation('quick-note-input')" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-500 transition p-1">
-                                    <i data-lucide="mic" class="w-5 h-5"></i>
-                                </button>
-                            </div>
-                            <button onclick="processSmartNote()" class="w-full bg-white text-black px-5 py-3.5 rounded-2xl font-bold text-[14px] hover:bg-gray-200 transition shadow-lg active:scale-[0.99]">
-                                Guardar Anotación
-                            </button>
-                        </div>
-                        <div id="quick-notes-list" class="space-y-2.5 mt-4 max-h-36 overflow-y-auto pr-1 text-[13px] text-gray-300"></div>
+        <!-- Panel de Control Ejecutivo (Asana Overview + Agenda Semanal Real) -->
+        <section class="px-4 sm:px-6 pt-5 pb-3 w-full">
+            <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-5">
+                <div>
+                    <h2 class="text-[28px] sm:text-[32px] font-extrabold tracking-tight text-white leading-none">Panel de Control</h2>
+                    <p class="text-[13px] text-gray-400 font-medium mt-1.5" id="current-date">Cargando fecha...</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button id="my-day-toggle" onclick="toggleMyDayFilter()" class="px-3.5 py-1.5 rounded-full bg-gray-900 border border-gray-700 text-gray-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition">
+                        <i data-lucide="sun" class="w-3.5 h-3.5 text-amber-400"></i> Enfoque Hoy
+                    </button>
+                    <div id="day-filter-badge" class="hidden items-center gap-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-3.5 py-1.5 rounded-full text-xs font-semibold">
+                        <span id="day-filter-label">Filtro activo</span>
+                        <button onclick="clearDayFilter()" class="hover:text-white"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
                     </div>
-                </section>
-
-                <!-- Próximos Recordatorios -->
-                <section class="w-full">
-                    <div class="glass-panel p-5 rounded-3xl w-full shadow-xl">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-[12px] font-bold uppercase tracking-wider text-gray-300">Recordatorios</h3>
-                            <span class="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1 rounded-full" id="reminders-count">0</span>
-                        </div>
-                        <div id="reminders-list" class="space-y-3 max-h-56 overflow-y-auto pr-1"></div>
-                    </div>
-                </section>
+                </div>
             </div>
 
-            <!-- Columna Derecha: Grilla de Proyectos -->
-            <div class="w-full flex flex-col">
-                <div class="mb-6 sticky top-24 z-30">
-                    <div class="flex items-center gap-3 w-full glass-panel p-2 rounded-2xl shadow-lg border-gray-700/50">
-                        <div class="flex bg-gray-900 p-1.5 rounded-xl flex-1 overflow-x-auto shadow-inner border border-gray-700/50">
-                            <button onclick="setFilter('all')" id="filter-all" class="flex-1 min-w-[70px] px-4 py-2.5 rounded-lg text-[13px] font-semibold bg-gray-700 text-white shadow transition whitespace-nowrap">Todos</button>
-                            <button onclick="setFilter('enfoque')" id="filter-enfoque" class="flex-1 min-w-[80px] px-4 py-2.5 rounded-lg text-[13px] font-semibold text-gray-400 hover:text-white transition whitespace-nowrap">Enfoque</button>
-                            <button onclick="setFilter('cola')" id="filter-cola" class="flex-1 min-w-[70px] px-4 py-2.5 rounded-lg text-[13px] font-semibold text-gray-400 hover:text-white transition whitespace-nowrap">En Cola</button>
-                        </div>
-                        <button onclick="createNewProject()" class="p-3.5 bg-emerald-500 text-black rounded-xl flex-shrink-0 hover:bg-emerald-400 transition shadow-lg active:scale-[0.98]">
-                            <i data-lucide="plus" class="w-5 h-5"></i>
-                        </button>
+            <!-- 4 KPI Cards Interactivos (Estilo Asana Overview) -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                <button onclick="setFilter('all')" class="glass-panel p-4 rounded-2xl border border-white/10 text-left hover:border-amber-400/40 transition">
+                    <div class="flex items-center justify-between text-gray-400 mb-1.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wider">Pendientes</span>
+                        <i data-lucide="layers" class="w-4 h-4 text-amber-400"></i>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span id="kpi-pending" class="text-2xl sm:text-3xl font-extrabold text-white">0</span>
+                        <span class="text-xs text-gray-500">tareas</span>
+                    </div>
+                </button>
+
+                <div class="glass-panel p-4 rounded-2xl border border-white/10">
+                    <div class="flex items-center justify-between text-gray-400 mb-1.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wider">Completadas</span>
+                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span id="kpi-done" class="text-2xl sm:text-3xl font-extrabold text-emerald-400">0</span>
+                        <span id="kpi-total-label" class="text-xs text-gray-500">de 0</span>
                     </div>
                 </div>
 
-                <main class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 w-full pb-10" id="projects-container"></main>
+                <button onclick="setFilter('enfoque')" class="glass-panel p-4 rounded-2xl border border-white/10 text-left hover:border-orange-400/40 transition">
+                    <div class="flex items-center justify-between text-gray-400 mb-1.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wider">En Enfoque</span>
+                        <i data-lucide="flame" class="w-4 h-4 text-orange-400"></i>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span id="kpi-focus" class="text-2xl sm:text-3xl font-extrabold text-white">0</span>
+                        <span class="text-xs text-gray-500">clientes</span>
+                    </div>
+                </button>
+
+                <div class="glass-panel p-4 rounded-2xl border border-white/10">
+                    <div class="flex items-center justify-between text-gray-400 mb-1.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wider">Avance Global</span>
+                        <i data-lucide="trending-up" class="w-4 h-4 text-blue-400"></i>
+                    </div>
+                    <div class="flex items-center gap-3 mt-1">
+                        <span id="kpi-pct" class="text-2xl sm:text-3xl font-extrabold text-white">0%</span>
+                        <div class="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+                            <div id="kpi-pct-bar" class="h-full bg-emerald-500 transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Agenda Semanal Real Interactiva -->
+            <div class="glass-panel p-3.5 rounded-2xl border border-white/10">
+                <div class="flex items-center justify-between mb-2.5 px-1">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                        <i data-lucide="calendar-days" class="w-3.5 h-3.5 text-emerald-400"></i> Pendientes por Día de la Semana
+                    </span>
+                    <span id="week-pending-summary" class="text-[11px] text-gray-400 font-medium">0 agendados</span>
+                </div>
+                <div class="grid grid-cols-7 gap-1.5 sm:gap-2.5" id="weekly-schedule-bar"></div>
+            </div>
+        </section>
+
+        <!-- Cuerpo Principal: Columna Izquierda + Tablero de Clientes -->
+        <div class="flex flex-col lg:flex-row gap-6 px-4 sm:px-6 w-full mt-2">
+            
+            <!-- Columna Izquierda: Captura Inteligente con Gemini y Recordatorios -->
+            <div class="w-full lg:w-[340px] flex flex-col gap-5 shrink-0 lg:sticky lg:top-20 lg:h-[calc(100vh-110px)] lg:overflow-y-auto">
+                
+                <!-- Captura Rápida Conectada a Gemini -->
+                <section class="w-full">
+                    <div class="glass-panel p-5 rounded-3xl w-full shadow-xl border border-emerald-500/20">
+                        <div class="flex items-center justify-between mb-3.5">
+                            <h3 class="text-[12px] font-bold uppercase tracking-wider text-gray-200 flex items-center gap-2">
+                                <i data-lucide="sparkles" class="w-4 h-4 text-emerald-400"></i> Captura Rápida IA
+                            </h3>
+                            <span class="text-[10px] text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full font-semibold">Auto-Sync</span>
+                        </div>
+                        <div class="flex flex-col gap-2.5 w-full">
+                            <div class="relative w-full">
+                                <input type="text" id="quick-note-input" placeholder="Ej: Enviar artes a Ciudad Café mañana..." onkeydown="if(event.key==='Enter') processSmartNote()" class="w-full bg-gray-900/80 border border-gray-700 rounded-2xl pl-4 pr-11 py-3.5 text-[13px] text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition shadow-inner">
+                                <button onclick="startDictation('quick-note-input')" title="Dictar por voz" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-400 transition p-1.5">
+                                    <i data-lucide="mic" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            <button id="quick-note-btn" onclick="processSmartNote()" class="w-full bg-white text-black px-4 py-3 rounded-2xl font-bold text-[13px] hover:bg-gray-200 transition shadow-lg active:scale-[0.99] flex items-center justify-center gap-2">
+                                <i data-lucide="wand-2" class="w-4 h-4"></i> Procesar y Actualizar Todo
+                            </button>
+                        </div>
+                        <div id="quick-note-feedback" class="hidden mt-3 text-[12px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 px-3.5 py-2.5 rounded-xl leading-snug"></div>
+                        <div id="quick-notes-list" class="space-y-2 mt-3.5 max-h-32 overflow-y-auto pr-1 text-[12px] text-gray-300"></div>
+                    </div>
+                </section>
+
+                <!-- Recordatorios Activos -->
+                <section class="w-full">
+                    <div class="glass-panel p-5 rounded-3xl w-full shadow-xl">
+                        <div class="flex justify-between items-center mb-3.5">
+                            <h3 class="text-[12px] font-bold uppercase tracking-wider text-gray-200 flex items-center gap-2">
+                                <i data-lucide="bell-ring" class="w-4 h-4 text-amber-400"></i> Recordatorios
+                            </h3>
+                            <span class="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full" id="reminders-count">0</span>
+                        </div>
+                        <div id="reminders-list" class="space-y-2.5 max-h-64 overflow-y-auto pr-1"></div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Columna Derecha: Tablero Arrastrable de Clientes (Trello + Asana) -->
+            <div class="w-full flex flex-col">
+                <div class="mb-5 sticky top-20 z-30">
+                    <div class="glass-panel p-2 rounded-2xl shadow-lg border-gray-700/50 flex flex-col sm:flex-row gap-2">
+                        <div class="flex bg-gray-900 p-1 rounded-xl flex-1 overflow-x-auto shadow-inner border border-gray-700/50">
+                            <button onclick="setFilter('all')" id="filter-all" class="flex-1 min-w-[60px] px-3 py-2 rounded-lg text-[12px] font-semibold bg-gray-700 text-white shadow transition whitespace-nowrap">Todos</button>
+                            <button onclick="setFilter('enfoque')" id="filter-enfoque" class="flex-1 min-w-[70px] px-3 py-2 rounded-lg text-[12px] font-semibold text-gray-400 hover:text-white transition whitespace-nowrap">Enfoque</button>
+                            <button onclick="setFilter('cola')" id="filter-cola" class="flex-1 min-w-[65px] px-3 py-2 rounded-lg text-[12px] font-semibold text-gray-400 hover:text-white transition whitespace-nowrap">En Cola</button>
+                            <button onclick="setFilter('standby')" id="filter-standby" class="flex-1 min-w-[65px] px-3 py-2 rounded-lg text-[12px] font-semibold text-gray-400 hover:text-white transition whitespace-nowrap">Standby</button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="relative flex-1 sm:w-44">
+                                <i data-lucide="search" class="w-3.5 h-3.5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                                <input type="text" id="board-search" oninput="renderProjects()" placeholder="Buscar cliente/tarea..." class="w-full bg-gray-900 border border-gray-700/80 rounded-xl pl-8 pr-3 py-2 text-[12px] text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500">
+                            </div>
+                            <button onclick="createNewProject()" title="Nuevo Cliente" class="p-2.5 bg-emerald-500 text-black rounded-xl flex-shrink-0 hover:bg-emerald-400 transition shadow-lg active:scale-[0.98]">
+                                <i data-lucide="plus" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-gray-500 mt-2 px-1 flex items-center gap-1.5">
+                        <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i> Arrastra las tarjetas desde el ícono lateral para reordenar prioridades.
+                    </p>
+                </div>
+
+                <main class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 w-full pb-12" id="projects-container"></main>
             </div>
         </div>
     </div>
 
-    <!-- Dock Flotante Inferior -->
-    <div class="fixed bottom-6 sm:bottom-8 w-full flex justify-center z-50 px-4 pointer-events-none">
-        <nav class="glass-panel floating-dock rounded-full px-8 py-4 flex gap-10 items-center w-full max-w-xs justify-center pointer-events-auto shadow-2xl border border-white/10">
-            <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="flex flex-col items-center gap-1.5 text-white hover:scale-110 transition-transform">
-                <i data-lucide="layout-grid" class="w-6 h-6"></i>
-                <span class="text-[10px] font-medium">Inicio</span>
+    <!-- Input oculto para subir o tomar foto de la libreta/agenda -->
+    <input type="file" id="agenda-photo-input" accept="image/*" capture="environment" class="hidden" onchange="handleAgendaPhotoUpload(event)">
+
+    <!-- Dock Flotante Inferior (Inicio | Escanear Agenda | Chat IA) -->
+    <div class="fixed bottom-5 sm:bottom-7 w-full flex justify-center z-50 px-4 pointer-events-none">
+        <nav class="glass-panel floating-dock rounded-full px-7 py-3.5 flex gap-9 items-center w-full max-w-xs justify-between pointer-events-auto shadow-2xl border border-white/15">
+            <button onclick="window.scrollTo({top: 0, behavior: 'smooth'}); clearDayFilter();" class="flex flex-col items-center gap-1 text-white hover:scale-105 transition-transform">
+                <i data-lucide="layout-grid" class="w-5 h-5"></i>
+                <span class="text-[10px] font-semibold">Inicio</span>
             </button>
-            <button onclick="openSyncModal()" class="relative flex items-center justify-center -mt-12 hover:scale-110 transition-transform">
-                <div class="bg-gradient-to-b from-white to-gray-300 text-black p-5 rounded-full shadow-2xl border-b-4 border-gray-400">
-                    <i data-lucide="scan" class="w-8 h-8 stroke-[1.5]"></i>
+            
+            <button onclick="triggerAgendaScanner()" title="Escanear foto de libreta o agenda" class="relative flex items-center justify-center -mt-11 hover:scale-105 transition-transform group">
+                <div class="bg-gradient-to-b from-emerald-400 to-emerald-600 text-black rounded-full shadow-2xl border-2 border-black/40 flex items-center justify-center w-16 h-16">
+                    <i data-lucide="camera" class="w-7 h-7 stroke-[2]"></i>
                 </div>
+                <span class="absolute -bottom-5 text-[10px] font-bold text-emerald-400 whitespace-nowrap">Agenda</span>
             </button>
-            <button onclick="openContextModal()" class="flex flex-col items-center gap-1.5 text-gray-400 hover:text-white hover:scale-110 transition-transform">
-                <i data-lucide="folder-open" class="w-6 h-6"></i>
-                <span class="text-[10px] font-medium">Briefs</span>
+            
+            <button onclick="toggleAIChat()" class="flex flex-col items-center gap-1 text-gray-300 hover:text-emerald-400 hover:scale-105 transition-transform">
+                <i data-lucide="message-square-sparkles" class="w-5 h-5"></i>
+                <span class="text-[10px] font-semibold">Chat IA</span>
             </button>
         </nav>
     </div>
 
-    <!-- Modal Drawer Gemini -->
-    <div id="ai-chat-drawer" class="hidden fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex flex-col justify-end transition-opacity p-2 sm:p-0">
-        <div class="glass-panel w-full max-w-lg mx-auto rounded-t-[32px] p-6 border-t-2 border-emerald-500/20 flex flex-col h-[85vh] shadow-2xl mb-2 sm:mb-0">
-            <div class="w-14 h-1.5 bg-gray-600 rounded-full mx-auto mb-6"></div>
-            <div class="flex justify-between items-center mb-5">
-                <h3 class="text-[20px] font-bold text-white flex items-center gap-3">
-                    <i data-lucide="sparkles" class="w-6 h-6 text-emerald-500"></i> Inbox Inteligente Gemini
-                </h3>
-                <button onclick="toggleAIChat()" class="w-9 h-9 bg-gray-800 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition shadow-inner"><i data-lucide="x" class="w-5 h-5"></i></button>
+    <!-- Modal Drawer Chat Gemini -->
+    <div id="ai-chat-drawer" class="hidden fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex flex-col justify-end transition-opacity p-2 sm:p-0">
+        <div class="glass-panel w-full max-w-lg mx-auto rounded-t-[32px] p-6 border-t-2 border-emerald-500/30 flex flex-col h-[85vh] shadow-2xl mb-2 sm:mb-0">
+            <div class="w-14 h-1.5 bg-gray-600 rounded-full mx-auto mb-5"></div>
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h3 class="text-[19px] font-bold text-white flex items-center gap-2.5">
+                        <i data-lucide="sparkles" class="w-5 h-5 text-emerald-400"></i> Asistente DaottoOS
+                    </h3>
+                    <p class="text-[11px] text-gray-400">Organiza tareas, clientes y fotos de tu agenda</p>
+                </div>
+                <button onclick="toggleAIChat()" class="w-9 h-9 bg-gray-800 rounded-full flex items-center justify-center text-gray-400 hover:text-white transition"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            <div id="chat-messages" class="flex-1 overflow-y-auto space-y-5 text-[14px] pb-4 pr-1">
-                <div class="bg-gray-800 p-4 rounded-2xl rounded-tl-sm text-gray-200 border border-gray-700 w-[90%] shadow-md">Hola Frank. Estoy listo. Háblame de tus ideas de vuelo o instrucciones para clientes y yo las organizaré en el tablero.</div>
-            </div>
-            <div class="pt-5 mt-2 border-t border-gray-800 flex gap-3 w-full">
+            
+            <div id="chat-messages" class="flex-1 overflow-y-auto space-y-4 text-[13.5px] pb-4 pr-1"></div>
+
+            <div class="pt-3 border-t border-gray-800 flex gap-2.5 w-full items-center">
+                <button onclick="triggerAgendaScanner()" title="Subir foto de agenda" class="w-12 h-12 rounded-full bg-gray-900 border border-gray-700 text-gray-300 hover:text-emerald-400 flex items-center justify-center shrink-0 transition">
+                    <i data-lucide="image-plus" class="w-5 h-5"></i>
+                </button>
                 <div class="relative flex-1">
-                    <input type="text" id="chat-input" placeholder="Escribe o dicta tu idea..." onkeydown="if(event.key==='Enter') sendChatMessage()" class="w-full bg-gray-900 border border-gray-700 rounded-full pl-5 pr-12 py-4 text-[14px] text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition shadow-inner">
-                    <button onclick="startDictation('chat-input')" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-500 transition p-1">
-                        <i data-lucide="mic" class="w-5 h-5"></i>
+                    <input type="text" id="chat-input" placeholder="Escribe o dicta instrucciones..." onkeydown="if(event.key==='Enter') sendChatMessage()" class="w-full bg-gray-900 border border-gray-700 rounded-full pl-4 pr-11 py-3.5 text-[13.5px] text-white focus:outline-none focus:border-emerald-500 transition shadow-inner">
+                    <button onclick="startDictation('chat-input')" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-400 transition p-1">
+                        <i data-lucide="mic" class="w-4 h-4"></i>
                     </button>
                 </div>
-                <button onclick="sendChatMessage()" class="bg-emerald-500 text-black w-14 h-14 rounded-full flex items-center justify-center shrink-0 hover:bg-emerald-400 active:scale-[0.98] transition shadow-lg">
-                    <i data-lucide="arrow-up" class="w-6 h-6"></i>
+                <button id="chat-send-btn" onclick="sendChatMessage()" class="bg-emerald-500 text-black w-12 h-12 rounded-full flex items-center justify-center shrink-0 hover:bg-emerald-400 active:scale-[0.98] transition shadow-lg">
+                    <i data-lucide="arrow-up" class="w-5 h-5"></i>
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Modals -->
-    <div id="modal-sync" class="hidden fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-center justify-center px-4 p-2">
-        <div class="glass-panel p-8 rounded-[32px] w-full max-w-sm text-center shadow-2xl border border-white/10">
-            <div class="w-16 h-16 bg-gray-800 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-inner border border-gray-700">
-                <i data-lucide="scan" class="w-9 h-9 text-white stroke-[1.5]"></i>
+    <!-- Modal Configuración API Key de Gemini -->
+    <div id="modal-apikey" class="hidden fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center px-4">
+        <div class="glass-panel p-7 rounded-[28px] w-full max-w-md shadow-2xl border border-white/10">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-[19px] font-bold text-white flex items-center gap-2">
+                    <i data-lucide="key-round" class="w-5 h-5 text-emerald-400"></i> Conectar Gemini API
+                </h3>
+                <button onclick="closeModal('modal-apikey')" class="text-gray-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
-            <h3 class="text-[22px] font-bold mb-2 text-white">Sincronización Visual</h3>
-            <p class="text-[14px] text-gray-300 mb-8 leading-relaxed">
-                Toma la foto de tu libreta y súbela al <strong>Inbox de Gemini</strong> (botón superior). Gemini analizará tus trazos y actualizará el tablero automáticamente.
+            <p class="text-[13px] text-gray-300 mb-4 leading-relaxed">
+                Pega tu API Key de Google AI Studio. Se guarda únicamente en tu navegador (<code class="text-emerald-400">localStorage</code>) para activar el escáner de fotos de agenda, el chat y la captura inteligente sin exponerla en GitHub.
             </p>
-            <button onclick="closeModal('modal-sync')" class="w-full bg-white text-black font-bold py-4 rounded-2xl text-[16px] active:scale-[0.98] shadow-lg">Entendido</button>
+            <input type="password" id="gemini-api-key-input" placeholder="AIzaSy..." class="w-full bg-gray-900 border border-gray-700 rounded-2xl px-4 py-3.5 text-[13px] text-white mb-4 focus:outline-none focus:border-emerald-500">
+            <div class="flex gap-2.5">
+                <button onclick="saveGeminiApiKey()" class="flex-1 bg-emerald-500 text-black font-bold py-3.5 rounded-2xl text-[14px] hover:bg-emerald-400 transition">Guardar Clave</button>
+                <button onclick="closeModal('modal-apikey')" class="px-5 bg-gray-800 text-gray-300 font-semibold py-3.5 rounded-2xl text-[14px]">Cerrar</button>
+            </div>
         </div>
     </div>
 
-    <div id="modal-context" class="hidden fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex flex-col justify-end p-2 sm:p-0">
-        <div class="glass-panel w-full max-w-lg mx-auto rounded-t-[32px] p-6 flex flex-col max-h-[85vh] shadow-2xl border border-white/10 mb-2 sm:mb-0">
-            <div class="w-14 h-1.5 bg-gray-600 rounded-full mx-auto mb-6"></div>
-            <h3 class="text-[20px] font-bold text-white mb-5">Briefs y Contexto de Clientes</h3>
-            <div class="space-y-4 overflow-y-auto flex-1 pr-1" id="briefs-list"></div>
-            <button onclick="closeModal('modal-context')" class="w-full bg-gray-800 text-white mt-6 font-semibold py-4 rounded-2xl text-[16px]">Cerrar</button>
+    <!-- Modal Escaneo de Foto en Progreso / Resultado -->
+    <div id="modal-scan-preview" class="hidden fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center px-4">
+        <div class="glass-panel p-6 rounded-[28px] w-full max-w-md shadow-2xl border border-emerald-500/30 text-center">
+            <img id="scan-preview-img" src="" class="w-full max-h-56 object-contain rounded-2xl mb-4 border border-white/10 bg-black/50">
+            <div id="scan-status-box" class="py-2">
+                <div class="inline-block w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin mb-2"></div>
+                <p class="text-sm font-semibold text-white">Analizando trazos y notas con Gemini Vision...</p>
+                <p class="text-xs text-gray-400 mt-1">Extrayendo clientes, tareas y fechas para tu tablero</p>
+            </div>
+            <button id="scan-close-btn" onclick="closeModal('modal-scan-preview')" class="hidden w-full mt-4 bg-white text-black font-bold py-3 rounded-2xl text-sm">Listo</button>
         </div>
     </div>
 
@@ -210,8 +325,10 @@
         lucide.createIcons();
         
         let currentFilter = 'all';
+        let selectedDayFilter = null;
+        let onlyTodayTasks = false;
+        let sortableInstance = null;
 
-        // Configuración Firebase Realtime Database
         const firebaseConfig = { 
             databaseURL: "https://daotto-327c2-default-rtdb.firebaseio.com/"
         };
@@ -220,22 +337,62 @@
             firebase.initializeApp(firebaseConfig);
         }
         const db = firebase.database();
-        document.getElementById('sync-status').innerText = "ONLINE (CLOUD)";
 
-        // Datos iniciales precargados con tus proyectos actuales
+        db.ref('.info/connected').on('value', (snap) => {
+            const statusEl = document.getElementById('sync-status');
+            if (snap.val() === true) {
+                statusEl.innerText = "ONLINE (CLOUD)";
+                statusEl.className = "text-[10px] text-emerald-400 font-medium uppercase tracking-widest";
+            } else {
+                statusEl.innerText = "SINCRONIZANDO...";
+                statusEl.className = "text-[10px] text-amber-400 font-medium uppercase tracking-widest";
+            }
+        });
+
         let appData = {
             projects: [
-                { id: 'p1', name: 'Veli Vita', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Branding integral, moodboard, propuesta gráfica y cotización.', tasks: [{ id: 't1_1', text: 'Armar Moodboard y propuesta', done: false }] },
-                { id: 'p2', name: 'Peluzzia', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Identidad cercana, carruseles educativos y Grilla Dos.', tasks: [{ id: 't2_1', text: 'Finalizar Grilla Dos', done: false }] },
-                { id: 'p3', name: 'Señor Emiro', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Logotipo clásico, tipografía y guía de estilo.', tasks: [{ id: 't3_1', text: 'Montar fotografía en logo', done: false }] },
-                { id: 'p4', name: 'Ciudad Café', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Gestión de cartas, promociones y material P.O.P.', tasks: [{ id: 't4_1', text: 'Terminar diseños de promos y cartas', done: false }] },
-                { id: 'p5', name: 'FastWay', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Edición logística y de Reels.', tasks: [{ id: 't5_1', text: 'Edición de Reels', done: false }] },
-                { id: 'p6', name: 'Natoura', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Diseño comercial de valla, fachada y ads.', tasks: [{ id: 't6_1', text: 'Diseño de fachada', done: false }] },
-                { id: 'p7', name: 'Labomed', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Tríptico, pendón y lanyard.', tasks: [{ id: 't7_1', text: 'Adelantar lanyard', done: false }] },
-                { id: 'p8', name: 'Puyaos', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Diseño de etiqueta de café.', tasks: [{ id: 't8_1', text: 'Finalizar etiqueta de café', done: false }] },
-                { id: 'p9', name: 'Cafetero VE', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Doypack, empaque y planimetría.', tasks: [{ id: 't9_1', text: 'Revisión de empaque con cliente', done: false }] }
+                { id: 'p1', name: 'Veli Vita', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Branding integral, moodboard, propuesta gráfica y cotización.', tasks: [{ id: 't1_1', text: 'Armar Moodboard y propuesta', done: false, priority: 'alta', today: true }] },
+                { id: 'p2', name: 'Peluzzia', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Identidad cercana, carruseles educativos y Grilla Dos.', tasks: [{ id: 't2_1', text: 'Finalizar Grilla Dos', done: false, priority: 'alta', today: true }] },
+                { id: 'p3', name: 'Señor Emiro', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Logotipo clásico, tipografía y guía de estilo.', tasks: [{ id: 't3_1', text: 'Montar fotografía en logo', done: false, priority: 'media', today: true }] },
+                { id: 'p4', name: 'Ciudad Café', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Gestión de cartas, promociones y material P.O.P.', tasks: [{ id: 't4_1', text: 'Terminar diseños de promos y cartas', done: false, priority: 'alta', today: true }] },
+                { id: 'p5', name: 'FastWay', category: 'enfoque', status: 'Enfoque', statusColor: 'bg-emerald-500', brief: 'Edición logística y de Reels.', tasks: [{ id: 't5_1', text: 'Edición de Reels', done: false, priority: 'media', today: false }] },
+                { id: 'p6', name: 'Natoura', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Diseño comercial de valla, fachada y ads.', tasks: [{ id: 't6_1', text: 'Diseño de fachada', done: false, priority: 'baja', today: false }] },
+                { id: 'p7', name: 'Labomed', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Tríptico, pendón y lanyard.', tasks: [{ id: 't7_1', text: 'Adelantar lanyard', done: false, priority: 'media', today: false }] },
+                { id: 'p8', name: 'Puyaos', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Diseño de etiqueta de café.', tasks: [{ id: 't8_1', text: 'Finalizar etiqueta de café', done: false, priority: 'media', today: false }] },
+                { id: 'p9', name: 'Cafetero VE', category: 'cola', status: 'En Cola', statusColor: 'bg-blue-500', brief: 'Doypack, empaque y planimetría.', tasks: [{ id: 't9_1', text: 'Revisión de empaque con cliente', done: false, priority: 'baja', today: false }] }
             ],
-            quickNotes: [], reminders: [], chatLogs: []
+            quickNotes: [],
+            reminders: [],
+            chatLogs: []
+        };
+
+        function updateApiKeyIndicator() {
+            const key = localStorage.getItem('daotto_gemini_key');
+            const dot = document.getElementById('api-dot');
+            const txt = document.getElementById('api-btn-text');
+            if (key && key.trim().length > 10) {
+                dot.className = "w-2 h-2 rounded-full bg-emerald-400";
+                txt.innerText = "IA Activa";
+            } else {
+                dot.className = "w-2 h-2 rounded-full bg-amber-400 animate-pulse";
+                txt.innerText = "Configurar IA";
+            }
+        }
+
+        window.openApiKeyModal = () => {
+            document.getElementById('gemini-api-key-input').value = localStorage.getItem('daotto_gemini_key') || '';
+            document.getElementById('modal-apikey').classList.remove('hidden');
+        };
+
+        window.saveGeminiApiKey = () => {
+            const val = document.getElementById('gemini-api-key-input').value.trim();
+            if (val) {
+                localStorage.setItem('daotto_gemini_key', val);
+            } else {
+                localStorage.removeItem('daotto_gemini_key');
+            }
+            updateApiKeyIndicator();
+            closeModal('modal-apikey');
         };
 
         function loadData() {
@@ -243,10 +400,10 @@
                 const data = snapshot.val();
                 if (data) {
                     appData = { ...appData, ...data };
-                    appData.projects = appData.projects || [];
-                    appData.quickNotes = appData.quickNotes || [];
-                    appData.reminders = appData.reminders || [];
-                    appData.chatLogs = appData.chatLogs || [];
+                    appData.projects = Array.isArray(appData.projects) ? appData.projects : Object.values(appData.projects || {});
+                    appData.quickNotes = Array.isArray(appData.quickNotes) ? appData.quickNotes : Object.values(appData.quickNotes || {});
+                    appData.reminders = Array.isArray(appData.reminders) ? appData.reminders : Object.values(appData.reminders || {});
+                    appData.chatLogs = Array.isArray(appData.chatLogs) ? appData.chatLogs : Object.values(appData.chatLogs || {});
                     updateUI();
                 } else {
                     saveData();
@@ -256,6 +413,251 @@
 
         function saveData() {
             db.ref('daotto_data_v6').set(appData);
+        }
+
+        async function callGeminiBoardAgent(userText, imageBase64 = null, imageMime = null) {
+            const apiKey = localStorage.getItem('daotto_gemini_key');
+            if (!apiKey) {
+                openApiKeyModal();
+                throw new Error("Falta configurar tu Gemini API Key.");
+            }
+
+            const existingProjects = appData.projects.map(p => `${p.name} (${p.status})`).join(', ');
+            const todayStr = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+            const systemPrompt = `Eres el motor inteligente de DaottoOS para Frank (Director Creativo de Hiuga Brand Group y fundador de Cospe Café en Boconó, Venezuela).
+Hoy es ${todayStr}.
+Proyectos existentes en el tablero: [${existingProjects}].
+
+Analiza la instrucción de texto y/o la imagen de la libreta/agenda manuscrita de Frank.
+Extrae acciones concretas y responde ÚNICAMENTE con un objeto JSON válido (sin markdown, sin bloques de código) con esta estructura exacta:
+{
+  "reply": "Respuesta breve, directa y útil para Frank confirmando lo que se actualizó en el tablero.",
+  "actions": [
+    {
+      "type": "add_task",
+      "projectName": "Nombre exacto del cliente existente o nuevo cliente",
+      "category": "enfoque",
+      "taskText": "Descripción clara de la tarea",
+      "priority": "alta|media|baja",
+      "today": true,
+      "brief": "Contexto breve opcional si es proyecto nuevo"
+    },
+    {
+      "type": "add_reminder",
+      "text": "Texto del recordatorio (incluye cliente y hora si aplica)",
+      "dayOfWeek": "Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo|Hoy",
+      "priority": "Alta|Media"
+    },
+    {
+      "type": "add_note",
+      "text": "Idea rápida o nota suelta si no pertenece a una tarea"
+    }
+  ]
+}
+Reglas:
+- Si la imagen tiene varias líneas o viñetas manuscritas, extrae TODAS las tareas y recordatorios que identifiques.
+- Si mencionas un cliente parecido a uno existente (ej. 'Emiro' -> 'Señor Emiro', 'Veli' -> 'Veli Vita'), usa el nombre exacto del proyecto existente.
+- Si se menciona un día o fecha (ej. 'lunes', 'mañana', 'hoy'), crea también un elemento 'add_reminder' con el campo 'dayOfWeek' correspondiente.`;
+
+            const parts = [{ text: systemPrompt }];
+            if (userText) {
+                parts.push({ text: `Entrada de Frank: ${userText}` });
+            }
+            if (imageBase64 && imageMime) {
+                parts.push({
+                    inline_data: {
+                        mime_type: imageMime,
+                        data: imageBase64
+                    }
+                });
+            }
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts }],
+                    generationConfig: {
+                        temperature: 0.2,
+                        responseMimeType: "application/json"
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData?.error?.message || `Error HTTP ${response.status}`);
+            }
+
+            const result = await response.json();
+            const rawText = result?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+            return JSON.parse(rawText);
+        }
+
+        function applyGeminiActions(aiResult) {
+            if (!aiResult || !Array.isArray(aiResult.actions)) return 0;
+            let count = 0;
+
+            aiResult.actions.forEach(act => {
+                if (act.type === 'add_task' && act.taskText) {
+                    const targetName = (act.projectName || 'General').trim();
+                    let proj = appData.projects.find(p => p.name.toLowerCase() === targetName.toLowerCase());
+                    if (!proj) {
+                        const cat = act.category === 'cola' ? 'cola' : (act.category === 'standby' ? 'standby' : 'enfoque');
+                        const statusMap = { enfoque: 'Enfoque', cola: 'En Cola', standby: 'Standby' };
+                        const colorMap = { enfoque: 'bg-emerald-500', cola: 'bg-blue-500', standby: 'bg-gray-500' };
+                        proj = {
+                            id: 'p_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                            name: targetName,
+                            category: cat,
+                            status: statusMap[cat],
+                            statusColor: colorMap[cat],
+                            brief: act.brief || 'Proyecto creado automáticamente desde IA.',
+                            tasks: []
+                        };
+                        appData.projects.unshift(proj);
+                    }
+                    proj.tasks = proj.tasks || [];
+                    proj.tasks.push({
+                        id: 't_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                        text: act.taskText,
+                        done: false,
+                        priority: act.priority || 'media',
+                        today: Boolean(act.today)
+                    });
+                    count++;
+                } else if (act.type === 'add_reminder' && act.text) {
+                    appData.reminders.unshift({
+                        text: act.text,
+                        date: act.dayOfWeek || 'Hoy',
+                        priority: act.priority || 'Alta'
+                    });
+                    count++;
+                } else if (act.type === 'add_note' && act.text) {
+                    appData.quickNotes.unshift(act.text);
+                    count++;
+                }
+            });
+
+            if (count > 0) saveData();
+            return count;
+        }
+
+        window.triggerAgendaScanner = () => {
+            const apiKey = localStorage.getItem('daotto_gemini_key');
+            if (!apiKey) {
+                openApiKeyModal();
+                return;
+            }
+            document.getElementById('agenda-photo-input').click();
+        };
+
+        window.handleAgendaPhotoUpload = (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const dataUrl = e.target.result;
+                const base64Data = dataUrl.split(',')[1];
+                const mimeType = file.type || 'image/jpeg';
+
+                const modal = document.getElementById('modal-scan-preview');
+                const imgEl = document.getElementById('scan-preview-img');
+                const statusBox = document.getElementById('scan-status-box');
+                const closeBtn = document.getElementById('scan-close-btn');
+
+                imgEl.src = dataUrl;
+                closeBtn.classList.add('hidden');
+                statusBox.innerHTML = `
+                    <div class="inline-block w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin mb-2"></div>
+                    <p class="text-sm font-semibold text-white">Analizando trazos y notas con Gemini Vision...</p>
+                    <p class="text-xs text-gray-400 mt-1">Extrayendo clientes, tareas y fechas para tu tablero</p>
+                `;
+                modal.classList.remove('hidden');
+
+                try {
+                    const aiResult = await callGeminiBoardAgent(
+                        "Lee esta foto de mi agenda/libreta manuscrita. Extrae todas las tareas pendientes, proyectos de clientes y recordatorios con fecha.",
+                        base64Data,
+                        mimeType
+                    );
+                    const applied = applyGeminiActions(aiResult);
+                    appData.chatLogs.push({ from: 'user', text: '📸 [Foto de agenda escaneada]' });
+                    appData.chatLogs.push({ from: 'ai', text: aiResult.reply || `Listo Frank, actualicé ${applied} elementos desde tu agenda.` });
+                    saveData();
+
+                    statusBox.innerHTML = `
+                        <div class="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-2">
+                            <i data-lucide="check" class="w-6 h-6"></i>
+                        </div>
+                        <p class="text-sm font-bold text-emerald-400">¡Tablero Actualizado! (${applied} acciones)</p>
+                        <p class="text-xs text-gray-200 mt-1.5 leading-relaxed">${aiResult.reply || 'Tareas y recordatorios sincronizados.'}</p>
+                    `;
+                    lucide.createIcons();
+                } catch (err) {
+                    statusBox.innerHTML = `
+                        <p class="text-sm font-bold text-red-400">No se pudo procesar la foto</p>
+                        <p class="text-xs text-gray-300 mt-1">${err.message}</p>
+                    `;
+                } finally {
+                    closeBtn.classList.remove('hidden');
+                    event.target.value = '';
+                }
+            };
+            reader.readAsDataURL(file);
+        };
+
+        async function processSmartNote() {
+            const input = document.getElementById('quick-note-input');
+            const btn = document.getElementById('quick-note-btn');
+            const feedback = document.getElementById('quick-note-feedback');
+            const val = input.value.trim();
+            if (!val) return;
+
+            const apiKey = localStorage.getItem('daotto_gemini_key');
+            if (!apiKey) {
+                appData.quickNotes.unshift(val);
+                const valLower = val.toLowerCase();
+                const matchedProj = appData.projects.find(p => valLower.includes(p.name.toLowerCase()));
+                if (matchedProj) {
+                    matchedProj.tasks = matchedProj.tasks || [];
+                    matchedProj.tasks.push({ id: 't_' + Date.now(), text: val, done: false, priority: 'media', today: true });
+                    appData.reminders.unshift({ text: `${matchedProj.name}: ${val}`, date: 'Hoy', priority: 'Alta' });
+                } else {
+                    appData.reminders.unshift({ text: val, date: 'Hoy', priority: 'Media' });
+                }
+                input.value = '';
+                saveData();
+                feedback.innerText = "Guardado en Firebase. Configura tu 'IA Key' arriba para clasificación automática con Gemini.";
+                feedback.classList.remove('hidden');
+                setTimeout(() => feedback.classList.add('hidden'), 4500);
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = `<span class="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></span> Sincronizando con Gemini...`;
+
+            try {
+                const aiResult = await callGeminiBoardAgent(val);
+                const applied = applyGeminiActions(aiResult);
+                if (applied === 0) {
+                    appData.quickNotes.unshift(val);
+                    saveData();
+                }
+                input.value = '';
+                feedback.innerText = aiResult.reply || "Tablero actualizado correctamente.";
+                feedback.classList.remove('hidden');
+                setTimeout(() => feedback.classList.add('hidden'), 5000);
+            } catch (err) {
+                feedback.innerText = `Error IA: ${err.message}`;
+                feedback.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i data-lucide="wand-2" class="w-4 h-4"></i> Procesar y Actualizar Todo`;
+                lucide.createIcons();
+            }
         }
 
         function startDictation(inputId) {
@@ -280,157 +682,272 @@
                 recognition.onerror = function() {
                     inputEl.placeholder = originalPlaceholder;
                     recognition.stop();
-                }
+                };
             } else {
                 alert("Tu navegador no soporta dictado por voz. Usa Chrome o Safari.");
             }
         }
 
-        function filterByDay(dayName) {
-            const pendingForDay = appData.reminders.filter(r => r.date && r.date.toLowerCase().includes(dayName.toLowerCase()));
-            if(pendingForDay.length > 0) {
-                alert(`Recordatorios para el ${dayName}:\n\n` + pendingForDay.map(r => `- ${r.text}`).join('\n'));
-            } else {
-                alert(`No hay recordatorios agendados específicos para el ${dayName}.`);
-            }
-        }
-
-        function processSmartNote() {
-            const input = document.getElementById('quick-note-input');
-            const val = input.value.trim();
-            if(!val) return;
-
-            appData.quickNotes.unshift(val);
-            const valLower = val.toLowerCase();
-
-            let matchedProj = appData.projects.find(p => valLower.includes(p.name.toLowerCase()));
-            if (matchedProj) {
-                matchedProj.tasks = matchedProj.tasks || [];
-                matchedProj.tasks.push({ id: 't_' + Date.now(), text: val, done: false });
-                appData.reminders.unshift({ text: `Seguimiento: ${matchedProj.name} - ${val}`, date: 'Hoy', priority: 'Alta' });
-            } else {
-                appData.reminders.unshift({ text: val, date: 'Revisar', priority: 'Media' });
-            }
-
-            input.value = ''; 
-            saveData();
-        }
-
         function updateUI() {
-            renderWeeklyLoad();
+            renderKPIs();
+            renderWeeklySchedule();
             renderReminders();
             renderProjects();
             renderQuickNotes();
-            renderBriefs();
             renderChatLogs();
             lucide.createIcons();
         }
 
-        function renderWeeklyLoad() {
-            const days = [{d:'LUN', full:'Lunes'}, {d:'MAR', full:'Martes'}, {d:'MIÉ', full:'Miércoles'}, {d:'JUE', full:'Jueves'}, {d:'VIE', full:'Viernes'}, {d:'SÁB', full:'Sábado'}, {d:'DOM', full:'Domingo'}];
-            const container = document.getElementById('weekly-load-bar');
-            const todayIndex = (new Date().getDay() + 6) % 7; 
-            
-            container.innerHTML = days.map((day, idx) => {
+        function renderKPIs() {
+            let totalTasks = 0;
+            let doneTasks = 0;
+            let focusProjects = 0;
+
+            appData.projects.forEach(p => {
+                if (p.category === 'enfoque') focusProjects++;
+                const tasks = p.tasks || [];
+                totalTasks += tasks.length;
+                doneTasks += tasks.filter(t => t.done).length;
+            });
+
+            const pendingTasks = totalTasks - doneTasks;
+            const pct = totalTasks === 0 ? 0 : Math.round((doneTasks / totalTasks) * 100);
+
+            document.getElementById('kpi-pending').innerText = pendingTasks;
+            document.getElementById('kpi-done').innerText = doneTasks;
+            document.getElementById('kpi-total-label').innerText = `de ${totalTasks}`;
+            document.getElementById('kpi-focus').innerText = focusProjects;
+            document.getElementById('kpi-pct').innerText = `${pct}%`;
+            document.getElementById('kpi-pct-bar').style.width = `${pct}%`;
+        }
+
+        function renderWeeklySchedule() {
+            const daysConfig = [
+                { d: 'LUN', full: 'Lunes' },
+                { d: 'MAR', full: 'Martes' },
+                { d: 'MIÉ', full: 'Miércoles' },
+                { d: 'JUE', full: 'Jueves' },
+                { d: 'VIE', full: 'Viernes' },
+                { d: 'SÁB', full: 'Sábado' },
+                { d: 'DOM', full: 'Domingo' }
+            ];
+            const container = document.getElementById('weekly-schedule-bar');
+            const now = new Date();
+            const todayIndex = (now.getDay() + 6) % 7;
+            const monday = new Date(now);
+            monday.setDate(now.getDate() - todayIndex);
+
+            document.getElementById('week-pending-summary').innerText = `${appData.reminders.length} agendados`;
+
+            container.innerHTML = daysConfig.map((day, idx) => {
+                const cellDate = new Date(monday);
+                cellDate.setDate(monday.getDate() + idx);
+                const dayNum = cellDate.getDate();
                 const isToday = idx === todayIndex;
-                const loadHeight = idx <= 4 ? (isToday ? 'h-12' : 'h-10') : 'h-4'; 
-                const loadColor = idx <= 4 ? 'bg-emerald-500' : 'bg-gray-600';
-                
+                const isSelected = selectedDayFilter === day.full;
+
+                const countForDay = appData.reminders.filter(r => {
+                    if (!r.date) return false;
+                    const dLow = r.date.toLowerCase();
+                    if (isToday && (dLow.includes('hoy') || dLow.includes('revisar'))) return true;
+                    return dLow.includes(day.full.toLowerCase());
+                }).length;
+
                 return `
-                    <div onclick="filterByDay('${day.full}')" class="cursor-pointer flex flex-col items-center justify-end p-2.5 rounded-2xl transition ${isToday ? 'bg-gray-900 border border-gray-700' : 'hover:bg-gray-800'}">
-                        <div class="w-full ${loadHeight} ${loadColor} rounded-md mb-2 transition-all duration-500"></div>
-                        <span class="text-[10px] font-bold ${isToday ? 'text-white' : 'text-gray-500'}">${day.d}</span>
+                    <button onclick="toggleDayFilter('${day.full}')" class="flex flex-col items-center justify-between p-2.5 rounded-2xl border transition text-center ${
+                        isSelected
+                            ? 'bg-emerald-500/20 border-emerald-400 text-white shadow-md'
+                            : isToday
+                                ? 'bg-gray-900 border-emerald-500/40 text-white'
+                                : 'bg-black/40 border-white/5 text-gray-400 hover:bg-gray-900/70'
+                    }">
+                        <span class="text-[10px] font-bold tracking-wider ${isToday ? 'text-emerald-400' : ''}">${day.d}</span>
+                        <span class="text-[16px] font-extrabold my-1 ${isToday ? 'text-white' : 'text-gray-200'}">${dayNum}</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            countForDay > 0 ? 'bg-emerald-500 text-black' : 'bg-gray-800/80 text-gray-500'
+                        }">${countForDay}</span>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        window.toggleMyDayFilter = () => {
+            onlyTodayTasks = !onlyTodayTasks;
+            const btn = document.getElementById('my-day-toggle');
+            if (onlyTodayTasks) {
+                btn.className = "px-3.5 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/50 text-amber-200 text-xs font-semibold flex items-center gap-1.5 transition";
+            } else {
+                btn.className = "px-3.5 py-1.5 rounded-full bg-gray-900 border border-gray-700 text-gray-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition";
+            }
+            renderProjects();
+        };
+
+        window.toggleDayFilter = (dayFull) => {
+            if (selectedDayFilter === dayFull) {
+                clearDayFilter();
+                return;
+            }
+            selectedDayFilter = dayFull;
+            const badge = document.getElementById('day-filter-badge');
+            document.getElementById('day-filter-label').innerText = `Día: ${dayFull}`;
+            badge.classList.remove('hidden');
+            badge.classList.add('flex');
+            renderWeeklySchedule();
+            renderReminders();
+        };
+
+        window.clearDayFilter = () => {
+            selectedDayFilter = null;
+            const badge = document.getElementById('day-filter-badge');
+            badge.classList.add('hidden');
+            badge.classList.remove('flex');
+            renderWeeklySchedule();
+            renderReminders();
+        };
+
+        function renderReminders() {
+            const list = document.getElementById('reminders-list');
+            const todayFull = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][new Date().getDay()];
+
+            const visibleReminders = selectedDayFilter
+                ? appData.reminders.filter(r => {
+                    const dLow = (r.date || '').toLowerCase();
+                    if (selectedDayFilter === todayFull && (dLow.includes('hoy') || dLow.includes('revisar'))) return true;
+                    return dLow.includes(selectedDayFilter.toLowerCase());
+                })
+                : appData.reminders;
+
+            document.getElementById('reminders-count').innerText = visibleReminders.length;
+            
+            if (visibleReminders.length === 0) {
+                list.innerHTML = `<p class="text-[12.5px] text-gray-500 text-center py-4">${selectedDayFilter ? `Sin pendientes para el ${selectedDayFilter}.` : 'No hay recordatorios pendientes.'}</p>`;
+                return;
+            }
+
+            list.innerHTML = visibleReminders.map((rem) => {
+                const realIdx = appData.reminders.indexOf(rem);
+                return `
+                    <div class="flex items-center justify-between dark-card px-3.5 py-3 rounded-2xl border border-gray-700/50 shadow-inner">
+                        <div class="flex items-center gap-2.5 flex-1 min-w-0 pr-2">
+                            <span class="w-2.5 h-2.5 rounded-full shrink-0 ${rem.priority === 'Alta' ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}"></span>
+                            <span class="text-white text-[12.5px] font-medium truncate" title="${rem.text}">${rem.text}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="text-[10px] text-gray-300 font-mono bg-gray-900 px-2 py-0.5 rounded-md border border-gray-800">${rem.date || 'Hoy'}</span>
+                            <button onclick="deleteReminder(${realIdx})" title="Completar recordatorio" class="text-gray-500 hover:text-emerald-400 p-1"><i data-lucide="check-circle" class="w-4 h-4"></i></button>
+                        </div>
                     </div>
                 `;
             }).join('');
         }
 
-        function renderReminders() {
-            const list = document.getElementById('reminders-list');
-            document.getElementById('reminders-count').innerText = appData.reminders.length;
-            
-            if (appData.reminders.length === 0) {
-                list.innerHTML = `<p class="text-[13px] text-gray-500 text-center py-4">No hay recordatorios.</p>`;
-                return;
-            }
-
-            list.innerHTML = appData.reminders.map((rem, idx) => `
-                <div class="flex items-center justify-between dark-card px-4 py-3.5 rounded-2xl border border-gray-700/50 shadow-inner">
-                    <div class="flex items-center gap-3 flex-1 min-w-0 pr-2">
-                        <span class="w-2.5 h-2.5 rounded-full shrink-0 ${rem.priority === 'Alta' ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}"></span>
-                        <span class="text-white text-[13px] font-medium truncate">${rem.text}</span>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <span class="text-[11px] text-gray-400 font-mono bg-gray-900 px-2 py-1 rounded-md">${rem.date || ''}</span>
-                        <button onclick="deleteReminder(${idx})" class="text-gray-500 hover:text-white p-1"><i data-lucide="x-circle" class="w-4 h-4"></i></button>
-                    </div>
-                </div>
-            `).join('');
+        function getPriorityBadge(priority) {
+            const p = (priority || 'media').toLowerCase();
+            if (p === 'alta') return `<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">Alta</span>`;
+            if (p === 'baja') return `<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-gray-700/60 text-gray-300">Baja</span>`;
+            return `<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">Media</span>`;
         }
 
         function renderProjects() {
             const container = document.getElementById('projects-container');
             container.innerHTML = '';
+            const searchQuery = (document.getElementById('board-search')?.value || '').trim().toLowerCase();
             
-            const filtered = appData.projects.filter(p => currentFilter === 'all' || p.category === currentFilter);
+            const filtered = appData.projects.filter(p => {
+                const matchesCat = currentFilter === 'all' || p.category === currentFilter;
+                if (!matchesCat) return false;
+                const tasks = p.tasks || [];
+                if (onlyTodayTasks && !tasks.some(t => t.today && !t.done)) return false;
+                if (!searchQuery) return true;
+                const inName = p.name.toLowerCase().includes(searchQuery);
+                const inBrief = (p.brief || '').toLowerCase().includes(searchQuery);
+                const inTasks = tasks.some(t => t.text.toLowerCase().includes(searchQuery));
+                return inName || inBrief || inTasks;
+            });
 
             if (filtered.length === 0) {
-                container.innerHTML = `<div class="sm:col-span-2 xl:col-span-3 text-center py-20 glass-panel rounded-3xl"><i data-lucide="clipboard-list" class="w-12 h-12 text-gray-600 mx-auto mb-4"></i><p class="text-gray-500 text-[14px]">No hay proyectos en esta categoría.</p></div>`;
+                container.innerHTML = `<div class="sm:col-span-2 xl:col-span-3 text-center py-16 glass-panel rounded-3xl"><i data-lucide="clipboard-list" class="w-11 h-11 text-gray-600 mx-auto mb-3"></i><p class="text-gray-500 text-[13.5px]">No hay clientes que coincidan con el filtro.</p></div>`;
                 return;
             }
 
             filtered.forEach((proj) => {
-                const projTotal = proj.tasks ? proj.tasks.length : 0;
-                const projDone = proj.tasks ? proj.tasks.filter(t => t.done).length : 0;
+                const allTasks = proj.tasks || [];
+                const visibleTasks = onlyTodayTasks ? allTasks.filter(t => t.today) : allTasks;
+                const projTotal = allTasks.length;
+                const projDone = allTasks.filter(t => t.done).length;
                 const progressPct = projTotal === 0 ? 0 : Math.round((projDone / projTotal) * 100);
                 const statusColor = proj.statusColor || 'bg-gray-500';
 
                 const card = document.createElement('div');
                 card.className = 'glass-panel rounded-3xl overflow-hidden project-card shadow-xl border border-gray-700/50 h-fit';
+                card.setAttribute('data-project-id', proj.id);
                 card.innerHTML = `
-                    <div class="px-5 py-4 cursor-pointer flex justify-between items-center bg-black/20" onclick="toggleAccordion('${proj.id}')">
-                        <div class="flex-1 pr-3 min-w-0">
-                            <div class="flex items-center justify-between mb-2">
-                                <div class="flex items-center gap-2">
-                                    <span class="w-2.5 h-2.5 rounded-full ${statusColor} shrink-0"></span>
-                                    <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider truncate">${proj.status || 'Activo'}</span>
+                    <div class="px-4 py-4 bg-black/25">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-start gap-2 flex-1 min-w-0">
+                                <button class="drag-handle cursor-grab active:cursor-grabbing text-gray-500 hover:text-white pt-1 shrink-0" title="Arrastrar para reordenar">
+                                    <i data-lucide="grip-vertical" class="w-4 h-4"></i>
+                                </button>
+                                <div class="flex-1 min-w-0 cursor-pointer" onclick="toggleAccordion('${proj.id}')">
+                                    <div class="flex items-center justify-between mb-1.5">
+                                        <div class="flex items-center gap-2">
+                                            <span class="w-2 h-2 rounded-full ${statusColor} shrink-0"></span>
+                                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider truncate">${proj.status || 'Activo'}</span>
+                                        </div>
+                                        <button onclick="event.stopPropagation(); changeProjectStatus('${proj.id}')" class="text-[10px] text-gray-400 hover:text-white bg-gray-900/90 border border-gray-700 px-2 py-0.5 rounded-md transition shrink-0">Estado</button>
+                                    </div>
+                                    <h2 class="text-[17px] font-bold text-white tracking-tight truncate">${proj.name}</h2>
+                                    <p onclick="event.stopPropagation(); editProjectBrief('${proj.id}')" title="Clic para editar brief" class="text-[11.5px] text-gray-400 mt-1 line-clamp-2 hover:text-gray-200 transition cursor-pointer">${proj.brief || 'Añadir contexto o brief...'}</p>
                                 </div>
-                                <button onclick="event.stopPropagation(); changeProjectStatus('${proj.id}')" class="text-[9px] text-gray-500 hover:text-white border border-gray-700 px-2 py-0.5 rounded-md transition shrink-0 ml-2">Mover</button>
                             </div>
-                            <h2 class="text-[18px] font-bold text-white tracking-tight truncate">${proj.name}</h2>
-                            <div class="mt-3 h-2 w-full bg-gray-700/50 rounded-full overflow-hidden flex shadow-inner">
+                            <div class="flex flex-col items-center gap-2 shrink-0">
+                                <button onclick="event.stopPropagation(); triggerReminderForProject('${proj.id}')" title="Crear recordatorio" class="w-8 h-8 rounded-xl bg-gray-900/90 flex items-center justify-center text-gray-400 hover:text-amber-400 transition border border-gray-700">
+                                    <i data-lucide="bell" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button onclick="toggleAccordion('${proj.id}')" class="p-1 text-gray-500 hover:text-white">
+                                    <i data-lucide="chevron-down" id="chevron-${proj.id}" class="w-4 h-4 chevron open"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <div class="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden flex">
                                 <div class="h-full ${progressPct === 100 ? 'bg-emerald-500' : 'bg-white'} transition-all duration-500 ease-out" style="width: ${progressPct}%"></div>
                             </div>
-                            <span class="text-xs text-gray-400 mt-1 block font-mono">${progressPct}% completado</span>
-                        </div>
-                        <div class="flex flex-col items-center gap-3 ml-1 shrink-0">
-                             <button onclick="event.stopPropagation(); triggerReminderForProject('${proj.id}')" class="w-9 h-9 rounded-2xl bg-gray-900/80 flex items-center justify-center text-gray-400 hover:text-white hover:scale-105 transition shadow-inner border border-gray-700">
-                                <i data-lucide="bell" class="w-4 h-4"></i>
-                            </button>
-                            <i data-lucide="chevron-down" id="chevron-${proj.id}" class="w-5 h-5 text-gray-500 chevron open"></i>
+                            <div class="flex justify-between items-center mt-1">
+                                <span class="text-[11px] text-gray-400 font-mono">${projDone}/${projTotal} tareas</span>
+                                <span class="text-[11px] text-gray-400 font-mono">${progressPct}%</span>
+                            </div>
                         </div>
                     </div>
-                    <div id="content-${proj.id}" class="accordion-content open bg-black/30 border-t border-gray-700/50">
-                        <div class="px-5 py-4 space-y-3">
-                            <div class="space-y-3" id="tasks-list-${proj.id}">
-                                ${proj.tasks && proj.tasks.length > 0 ? proj.tasks.map((task) => `
-                                    <div class="task-row flex items-start justify-between group bg-gray-900/40 p-3 rounded-xl border border-gray-800">
-                                        <label class="flex items-start gap-3 cursor-pointer flex-1 min-w-0 pt-0.5">
+
+                    <div id="content-${proj.id}" class="accordion-content open bg-black/35 border-t border-gray-700/40">
+                        <div class="px-4 py-3.5 space-y-2.5">
+                            <div class="space-y-2" id="tasks-list-${proj.id}">
+                                ${visibleTasks.length > 0 ? visibleTasks.map((task) => `
+                                    <div class="task-row flex items-start justify-between group bg-gray-900/50 p-2.5 rounded-xl border border-gray-800/80">
+                                        <label class="flex items-start gap-2.5 cursor-pointer flex-1 min-w-0 pt-0.5">
                                             <input type="checkbox" class="checkbox-custom mt-0.5" ${task.done ? 'checked' : ''} onchange="toggleTask('${proj.id}', '${task.id}', this.checked)">
-                                            <span class="task-label text-[13px] text-gray-200 transition leading-tight break-words pr-2">${task.text}</span>
+                                            <div class="flex-1 min-w-0">
+                                                <span class="task-label text-[12.5px] text-gray-200 transition leading-snug break-words block">${task.text}</span>
+                                                <div class="flex items-center gap-1.5 mt-1">
+                                                    <button type="button" onclick="event.preventDefault(); cycleTaskPriority('${proj.id}', '${task.id}')" title="Cambiar prioridad">${getPriorityBadge(task.priority)}</button>
+                                                    <button type="button" onclick="event.preventDefault(); toggleTaskToday('${proj.id}', '${task.id}')" title="Marcar para Enfoque Hoy" class="text-[9px] font-semibold px-1.5 py-0.5 rounded border transition ${task.today ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-gray-800/60 text-gray-500 border-gray-700/50 hover:text-gray-300'}">Hoy</button>
+                                                </div>
+                                            </div>
                                         </label>
-                                        <button onclick="deleteTask('${proj.id}', '${task.id}')" class="text-gray-600 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                        <button onclick="deleteTask('${proj.id}', '${task.id}')" class="text-gray-600 hover:text-red-500 p-1 opacity-70 sm:opacity-0 group-hover:opacity-100 transition shrink-0"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
                                     </div>
-                                `).join('') : '<p class="text-xs text-gray-600 italic px-2 py-1">No hay tareas.</p>'}
+                                `).join('') : '<p class="text-xs text-gray-600 italic px-1 py-1">Sin tareas pendientes en esta vista.</p>'}
                             </div>
-                            <div class="pt-3 border-t border-gray-800 flex gap-2.5 w-full items-center">
+                            <div class="pt-2.5 border-t border-gray-800/80 flex gap-2 w-full items-center">
                                 <div class="relative flex-1 min-w-0">
-                                    <input type="text" id="new-task-${proj.id}" placeholder="Nueva tarea..." onkeydown="if(event.key==='Enter') addTask('${proj.id}')" class="w-full bg-gray-900/70 border border-gray-700 rounded-xl pl-4 pr-10 py-2.5 text-[13px] text-white focus:outline-none focus:border-emerald-500 transition shadow-inner">
-                                    <button onclick="startDictation('new-task-${proj.id}')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-500 p-1">
-                                        <i data-lucide="mic" class="w-4 h-4"></i>
+                                    <input type="text" id="new-task-${proj.id}" placeholder="Nueva tarea..." onkeydown="if(event.key==='Enter') addTask('${proj.id}')" class="w-full bg-gray-900/80 border border-gray-700 rounded-xl pl-3.5 pr-9 py-2 text-[12.5px] text-white focus:outline-none focus:border-emerald-500 transition">
+                                    <button onclick="startDictation('new-task-${proj.id}')" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-400 p-1">
+                                        <i data-lucide="mic" class="w-3.5 h-3.5"></i>
                                     </button>
                                 </div>
-                                <button onclick="addTask('${proj.id}')" class="bg-gray-700 hover:bg-gray-600 text-white p-3 rounded-xl text-[13px] font-medium transition shrink-0 active:scale-[0.97]">
+                                <button onclick="addTask('${proj.id}')" class="bg-gray-800 hover:bg-gray-700 text-white p-2.5 rounded-xl transition shrink-0 border border-gray-700">
                                     <i data-lucide="plus" class="w-4 h-4"></i>
                                 </button>
                             </div>
@@ -439,70 +956,113 @@
                 `;
                 container.appendChild(card);
             });
+
+            initSortableCards();
         }
+
+        function initSortableCards() {
+            const container = document.getElementById('projects-container');
+            if (!container || typeof Sortable === 'undefined') return;
+            if (sortableInstance) sortableInstance.destroy();
+
+            sortableInstance = new Sortable(container, {
+                animation: 180,
+                handle: '.drag-handle',
+                ghostClass: 'sortable-ghost',
+                dragClass: 'sortable-drag',
+                onEnd: function () {
+                    const orderedIds = Array.from(container.querySelectorAll('[data-project-id]')).map(el => el.getAttribute('data-project-id'));
+                    const reordered = [];
+                    orderedIds.forEach(id => {
+                        const found = appData.projects.find(p => p.id === id);
+                        if (found) reordered.push(found);
+                    });
+                    appData.projects.forEach(p => {
+                        if (!reordered.some(r => r.id === p.id)) reordered.push(p);
+                    });
+                    appData.projects = reordered;
+                    saveData();
+                }
+            });
+        }
+
+        window.cycleTaskPriority = (projId, taskId) => {
+            const proj = appData.projects.find(p => p.id === projId);
+            const task = proj?.tasks?.find(t => t.id === taskId);
+            if (!task) return;
+            const order = ['baja', 'media', 'alta'];
+            const next = order[(order.indexOf((task.priority || 'media').toLowerCase()) + 1) % order.length];
+            task.priority = next;
+            saveData();
+        };
+
+        window.toggleTaskToday = (projId, taskId) => {
+            const proj = appData.projects.find(p => p.id === projId);
+            const task = proj?.tasks?.find(t => t.id === taskId);
+            if (!task) return;
+            task.today = !task.today;
+            saveData();
+        };
+
+        window.editProjectBrief = (projId) => {
+            const proj = appData.projects.find(p => p.id === projId);
+            if (!proj) return;
+            const updated = prompt(`Contexto / Brief de ${proj.name}:`, proj.brief || '');
+            if (updated !== null) {
+                proj.brief = updated.trim();
+                saveData();
+            }
+        };
 
         function renderQuickNotes() {
             const list = document.getElementById('quick-notes-list');
             if (appData.quickNotes.length === 0) {
-                list.innerHTML = `<p class="text-gray-500 text-center italic py-2">Vacío.</p>`;
+                list.innerHTML = `<p class="text-gray-500 text-center italic py-1.5 text-xs">Sin notas sueltas recientes.</p>`;
                 return;
             }
             list.innerHTML = appData.quickNotes.slice(0, 5).map((note, index) => `
-                <div class="flex items-center justify-between bg-gray-900/50 px-3.5 py-2.5 rounded-xl border border-gray-800 text-gray-300 shadow-inner">
-                    <span class="leading-tight pr-3 break-words flex-1 min-w-0 truncate">${note}</span>
-                    <button onclick="deleteQuickNote(${index})" class="text-gray-500 hover:text-white transition p-1 shrink-0"><i data-lucide="x" class="w-4 h-4"></i></button>
-                </div>
-            `).join('');
-        }
-
-        function renderBriefs() {
-            const list = document.getElementById('briefs-list');
-            if (appData.projects.length === 0) {
-                 list.innerHTML = `<p class="text-gray-500 text-center py-6">No hay proyectos.</p>`;
-                 return;
-            }
-            list.innerHTML = appData.projects.map(p => `
-                <div class="p-5 bg-gray-900 rounded-2xl border border-gray-700 shadow-inner">
-                    <strong class="text-white block mb-1.5 text-[15px]">${p.name}</strong>
-                    <p class="text-gray-400 text-[13px] leading-relaxed">${p.brief || 'Sin brief asignado. Agrega contexto en el chat.'}</p>
+                <div class="flex items-center justify-between bg-gray-900/60 px-3 py-2 rounded-xl border border-gray-800 text-gray-300">
+                    <span class="leading-tight pr-2 break-words flex-1 min-w-0 truncate">${note}</span>
+                    <button onclick="deleteQuickNote(${index})" class="text-gray-500 hover:text-white transition p-0.5 shrink-0"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
                 </div>
             `).join('');
         }
 
         function renderChatLogs() {
             const list = document.getElementById('chat-messages');
-            if(appData.chatLogs.length === 0) {
-                list.innerHTML = `<div class="bg-gray-800 p-4 rounded-2xl rounded-tl-sm text-gray-200 border border-gray-700 w-[90%] shadow-md">Hola Frank. Estoy listo. Háblame de tus ideas de vuelo o instrucciones para clientes y yo las organizaré en el tablero.</div>`;
+            if (appData.chatLogs.length === 0) {
+                list.innerHTML = `<div class="bg-gray-800/90 p-4 rounded-2xl rounded-tl-sm text-gray-200 border border-gray-700 w-[90%] shadow-md">Hola Frank. Dime qué tareas quieres asignar a tus clientes o toca el ícono de imagen para analizar una foto de tu libreta.</div>`;
                 return;
             }
-            const lastMessages = appData.chatLogs.slice(-10);
+            const lastMessages = appData.chatLogs.slice(-14);
             list.innerHTML = lastMessages.map(log => {
                 const isUser = typeof log === 'object' && log.from === 'user';
+                const text = typeof log === 'object' ? log.text : log;
                 return isUser ? 
-                    `<div class="bg-emerald-500/20 text-emerald-100 p-4 rounded-2xl rounded-tr-sm ml-auto w-[90%] border border-emerald-500/30 shadow-md">${log.text}</div>` :
-                    `<div class="bg-gray-800 p-4 rounded-2xl rounded-tl-sm text-gray-200 border border-gray-700 w-[90%] shadow-md">${log}</div>`;
+                    `<div class="bg-emerald-500/20 text-emerald-100 p-3.5 rounded-2xl rounded-tr-sm ml-auto w-[88%] border border-emerald-500/30 shadow-md">${text}</div>` :
+                    `<div class="bg-gray-800/90 p-3.5 rounded-2xl rounded-tl-sm text-gray-200 border border-gray-700 w-[90%] shadow-md">${text}</div>`;
             }).join('');
-            setTimeout(() => list.scrollTop = list.scrollHeight, 100);
+            setTimeout(() => list.scrollTop = list.scrollHeight, 80);
         }
 
         window.addTask = function(projId) {
             const input = document.getElementById(`new-task-${projId}`);
             const text = input.value.trim();
-            if(!text) return;
+            if (!text) return;
             const proj = appData.projects.find(p => p.id === projId);
-            if(!proj.tasks) proj.tasks = [];
-            proj.tasks.push({ id: 't_' + Date.now(), text, done: false });
+            if (!proj.tasks) proj.tasks = [];
+            proj.tasks.push({ id: 't_' + Date.now(), text, done: false, priority: 'media', today: false });
             input.value = '';
             saveData();
-        }
+        };
 
         window.deleteTask = function(projId, taskId) {
-            if(confirm('¿Eliminar esta tarea?')) {
+            if (confirm('¿Eliminar esta tarea?')) {
                 const proj = appData.projects.find(p => p.id === projId);
                 proj.tasks = proj.tasks.filter(t => t.id !== taskId);
                 saveData();
             }
-        }
+        };
 
         window.toggleTask = function(projId, taskId, isChecked) {
             const proj = appData.projects.find(p => p.id === projId);
@@ -512,44 +1072,46 @@
         };
 
         window.createNewProject = function() {
-            const name = prompt("Nombre de la nueva marca / proyecto:");
-            if(!name) return;
+            const name = prompt("Nombre del nuevo cliente o proyecto:");
+            if (!name || !name.trim()) return;
+            const brief = prompt("Brief o descripción rápida (opcional):") || "Nuevo proyecto activo.";
             appData.projects.unshift({
                 id: 'p_' + Date.now(),
-                name: name,
+                name: name.trim(),
                 category: 'enfoque',
                 status: 'Enfoque',
                 statusColor: 'bg-emerald-500',
-                brief: 'Nuevo proyecto. Agrega detalles.',
+                brief: brief.trim(),
                 tasks: []
             });
             saveData();
-        }
+        };
 
         window.changeProjectStatus = function(projId) {
             const proj = appData.projects.find(p => p.id === projId);
-            const opt = prompt(`Cambiar estado de "${proj.name}".\n1 = 🔥 Enfoque\n2 = 📥 En Cola\n3 = ⏸️ Standby`);
-            if(opt === '1') { proj.category = 'enfoque'; proj.status = 'Enfoque'; proj.statusColor = 'bg-emerald-500'; }
-            else if(opt === '2') { proj.category = 'cola'; proj.status = 'En Cola'; proj.statusColor = 'bg-blue-500'; }
-            else if(opt === '3') { proj.category = 'standby'; proj.status = 'Standby'; proj.statusColor = 'bg-gray-500'; }
+            const opt = prompt(`Cambiar estado de "${proj.name}":\n1 = Enfoque\n2 = En Cola\n3 = Standby`);
+            if (opt === '1') { proj.category = 'enfoque'; proj.status = 'Enfoque'; proj.statusColor = 'bg-emerald-500'; }
+            else if (opt === '2') { proj.category = 'cola'; proj.status = 'En Cola'; proj.statusColor = 'bg-blue-500'; }
+            else if (opt === '3') { proj.category = 'standby'; proj.status = 'Standby'; proj.statusColor = 'bg-gray-500'; }
             saveData();
-        }
+        };
 
         window.deleteQuickNote = function(index) {
             appData.quickNotes.splice(index, 1);
             saveData();
-        }
+        };
 
         window.deleteReminder = function(index) {
             appData.reminders.splice(index, 1);
             saveData();
-        }
+        };
 
         window.triggerReminderForProject = function(projId) {
             const proj = appData.projects.find(p => p.id === projId);
             const taskText = prompt(`¿Qué recordatorio crear para "${proj.name}"?`, "Avanzar en diseño");
-            const date = prompt("¿Para cuándo? (Ej: Mañana, Lunes)", "Mañana");
-            if(taskText && date) {
+            if (!taskText) return;
+            const date = prompt("¿Para qué día? (Ej: Hoy, Lunes, Martes, Miércoles, Jueves, Viernes)", "Hoy");
+            if (date) {
                 appData.reminders.unshift({ text: `${proj.name}: ${taskText}`, date: date, priority: 'Alta' });
                 saveData();
             }
@@ -557,9 +1119,10 @@
 
         window.setFilter = function(filter) {
             currentFilter = filter;
-            ['all', 'enfoque', 'cola'].forEach(f => {
+            ['all', 'enfoque', 'cola', 'standby'].forEach(f => {
                 const btn = document.getElementById(`filter-${f}`);
-                if(f === filter) {
+                if (!btn) return;
+                if (f === filter) {
                     btn.classList.remove('text-gray-400', 'hover:text-white');
                     btn.classList.add('bg-gray-700', 'text-white', 'shadow');
                 } else {
@@ -568,7 +1131,7 @@
                 }
             });
             renderProjects();
-        }
+        };
 
         window.toggleAccordion = function(id) {
             const content = document.getElementById(`content-${id}`);
@@ -580,49 +1143,46 @@
         window.toggleAIChat = () => {
             const drawer = document.getElementById('ai-chat-drawer');
             drawer.classList.toggle('hidden');
-            if(!drawer.classList.contains('hidden')) {
+            if (!drawer.classList.contains('hidden')) {
                 document.getElementById('chat-input').focus();
                 renderChatLogs();
             }
-        }
+        };
 
-        window.sendChatMessage = () => {
+        window.sendChatMessage = async () => {
             const input = document.getElementById('chat-input');
+            const sendBtn = document.getElementById('chat-send-btn');
             const text = input.value.trim();
-            if(!text) return;
+            if (!text) return;
             
-            appData.chatLogs.push({ from: 'user', text: text });
+            appData.chatLogs.push({ from: 'user', text });
             input.value = '';
-            
-            setTimeout(() => {
-                const textLower = text.toLowerCase();
-                let response = "";
-                
-                if (textLower.includes('reunión') || textLower.includes('cita')) {
-                    const dateMatch = textLower.match(/(mañana|lunes|martes|miércoles|jueves|viernes|sábado|domingo|\d{1,2}\/\d{1,2})/);
-                    const date = dateMatch ? dateMatch[0] : 'Pronto';
-                    response = `Entendido. He agendado una reunión para ${date}. ¿Algún cliente o proyecto en específico?`;
-                    appData.reminders.unshift({ text: `Reunión: ${text.substring(0,50)}...`, date: date, priority: 'Alta' });
-                } 
-                else if (textLower.includes('idea') || textLower.includes('volar')) {
-                    response = "¡Buena idea! He capturado esto en tu libreta de ideas de vuelo. ¿Es para algún proyecto activo?";
-                    appData.quickNotes.unshift(`💡 Idea: ${text.substring(0,50)}...`);
-                }
-                else {
-                    response = "Interesante. He registrado esta nota en tu historial. Si quieres que la convierta en una tarea o recordatorio, dímelo.";
-                }
+            renderChatLogs();
 
-                appData.chatLogs.push({ from: 'ai', text: response });
+            const apiKey = localStorage.getItem('daotto_gemini_key');
+            if (!apiKey) {
+                appData.chatLogs.push({ from: 'ai', text: 'Configura primero tu clave en el botón superior "Configurar IA" para que pueda actualizar el tablero automáticamente.' });
                 saveData();
-            }, 800);
-            
-            saveData();
-        }
+                return;
+            }
 
-        window.openSyncModal = () => document.getElementById('modal-sync').classList.remove('hidden');
-        window.openContextModal = () => { document.getElementById('modal-context').classList.remove('hidden'); renderBriefs(); }
+            sendBtn.disabled = true;
+            try {
+                const aiResult = await callGeminiBoardAgent(text);
+                applyGeminiActions(aiResult);
+                appData.chatLogs.push({ from: 'ai', text: aiResult.reply || 'Tablero actualizado.' });
+                saveData();
+            } catch (err) {
+                appData.chatLogs.push({ from: 'ai', text: `Error al conectar con Gemini: ${err.message}` });
+                saveData();
+            } finally {
+                sendBtn.disabled = false;
+            }
+        };
+
         window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
 
+        updateApiKeyIndicator();
         loadData();
     </script>
 </body>
