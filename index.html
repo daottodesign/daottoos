@@ -48,6 +48,11 @@
         .task-row{border-left:3px solid transparent}
         .task-row[data-p="alta"]{border-left-color:#ff453a}.task-row[data-p="media"]{border-left-color:#ff9f0a}.task-row[data-p="baja"]{border-left-color:#636366}
         .task-row:hover{background:rgba(255,255,255,.06)}
+    @keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
+        .progress-bar{position:relative;height:4px;border-radius:9999px;background:rgba(255,255,255,.08);overflow:hidden}
+        .progress-bar::after{content:"";position:absolute;inset:0;width:40%;background:#34c759;border-radius:9999px;animation:slide 1.2s ease-in-out infinite}
+        .kanban-list:empty::after{content:"Suelta una tarjeta aquí";display:block;text-align:center;font-size:11px;color:#636366;border:1px dashed #3a3a3c;border-radius:16px;padding:22px 8px}
+        .kanban-col{min-width:0}
     </style>
 </head>
 <body class="min-h-screen flex flex-col pb-32 sm:pb-36 selection:bg-emerald-500/30">
@@ -174,13 +179,17 @@
                         <div class="flex items-center justify-between mb-3">
                             <div>
                                 <h3 class="text-[13px] font-bold uppercase tracking-wider text-white flex items-center gap-2">
-                                    <i data-lucide="sparkles" class="w-4 h-4 text-emerald-400"></i> Chat IA · DaottoOS
+                                    <i data-lucide="sparkles" class="w-4 h-4 text-emerald-400"></i> Captura rápida · Chat IA
                                 </h3>
-                                <p class="text-[11px] text-gray-400 mt-0.5">Analiza tareas, actualiza estados o dicta órdenes</p>
+                                <p class="text-[11px] text-gray-400 mt-0.5">Escribe, dicta o sube una foto: la IA crea tareas y recordatorios</p>
                             </div>
                             <button onclick="clearChatHistory()" title="Limpiar historial de chat" class="text-[10px] text-gray-400 hover:text-white bg-gray-900/80 border border-gray-700/80 px-2.5 py-1 rounded-full transition">Limpiar</button>
                         </div>
 
+                        <div id="ai-progress" class="hidden mb-3 p-3 rounded-2xl bg-black/30 border border-emerald-500/20">
+                            <div class="flex items-center justify-between mb-2"><span id="ai-progress-title" class="text-[11.5px] font-semibold text-emerald-300">Analizando…</span><span class="text-[10px] text-gray-500">puedes seguir usando la app</span></div>
+                            <div class="progress-bar"></div>
+                        </div>
                         <!-- Historial de Conversación -->
                         <div id="chat-messages" class="space-y-3 max-h-60 min-h-[130px] overflow-y-auto pr-1 text-[12.5px] mb-3.5"></div>
 
@@ -217,7 +226,7 @@
                             </h3>
                             <span class="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full" id="reminders-count">0</span>
                         </div>
-                        <div id="reminders-list" class="space-y-2.5 max-h-60 overflow-y-auto pr-1"></div>
+                        <div id="reminders-list" class="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1"></div>
                     </div>
                 </section>
             </div>
@@ -243,11 +252,11 @@
                         </div>
                     </div>
                     <p class="text-[11px] text-gray-500 mt-2 px-1 flex items-center gap-1.5">
-                        <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i> Arrastra las tarjetas desde el ícono lateral para reordenar prioridades.
+                        <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i> Arrastra una tarjeta a otra columna para cambiar su estado (o usa «Mover ›»).
                     </p>
                 </div>
 
-                <main class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 w-full pb-12" id="projects-container"></main>
+                <main class="grid grid-cols-1 lg:grid-cols-3 items-start gap-4 w-full pb-12" id="projects-container"></main>
             </div>
         </div>
     </div>
@@ -277,12 +286,7 @@
         </nav>
     </div>
 
-    <!-- Pantalla de Carga IA -->
-    <div id="ai-loading-overlay" class="fixed inset-0 z-[115] bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center p-4">
-        <div class="w-12 h-12 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mb-3"></div>
-        <p class="text-sm font-semibold text-white" id="ai-loading-title">Analizando con Daotto IA...</p>
-        <p class="text-xs text-gray-400 mt-1">Sincronizando proyectos, tareas y recordatorios</p>
-    </div>
+    
 
     <!-- Modal de Confirmación de Acciones IA -->
     <div id="ai-review-modal" class="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md hidden items-end sm:items-center justify-center p-4">
@@ -426,19 +430,11 @@
         }
         /*END_HELPERS*/
 
-        function showLoading(show, title = "Analizando con Daotto IA...") {
-            const loader = document.getElementById('ai-loading-overlay');
-            const titleEl = document.getElementById('ai-loading-title');
-            if (titleEl) titleEl.innerText = title;
-            if (loader) {
-                if (show) {
-                    loader.classList.remove('hidden');
-                    loader.classList.add('flex');
-                } else {
-                    loader.classList.add('hidden');
-                    loader.classList.remove('flex');
-                }
-            }
+        function showLoading(show, title = 'Analizando con Daotto IA...') {
+            const box = document.getElementById('ai-progress'); if (!box) return;
+            document.getElementById('ai-progress-title').innerText = title;
+            box.classList.toggle('hidden', !show);
+            if (show) box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
 
         function updateApiKeyIndicator() {
@@ -471,11 +467,12 @@
             closeModal('modal-apikey');
         };
 
-        const CACHE_KEY = 'daotto_cache_v6'; const collapsed = new Set(); let saveTimer = null;
+        const CACHE_KEY = 'daotto_cache_v6'; const collapsed = new Set(); let saveTimer = null; let dirty = false;
         function cacheLocal() { try { localStorage.setItem(CACHE_KEY, JSON.stringify(appData)); } catch (e) {} }
         function loadData() {
             try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); if (c) { Object.assign(appData, normalizeData(c)); updateUI(); } } catch (e) {}
             db.ref('daotto_data_v6').on('value', (snap) => {
+                if (dirty) return; // hay un cambio local sin enviar: no lo pisamos con datos remotos
                 const data = snap.val();
                 if (data) { Object.assign(appData, normalizeData(data)); cacheLocal(); updateUI(); }
                 else saveData();
@@ -487,11 +484,11 @@
         }
         function saveData() {
             appData.chatLogs = appData.chatLogs.slice(-60);
-            cacheLocal(); updateUI();
+            cacheLocal(); updateUI(); dirty = true;
             clearTimeout(saveTimer);
             saveTimer = setTimeout(() => {
                 db.ref('daotto_data_v6').update({ projects: appData.projects, reminders: appData.reminders, chatLogs: appData.chatLogs })
-                  .catch(e => console.error('Firebase:', e));
+                  .catch(e => console.error('Firebase:', e)).then(() => { dirty = false; });
             }, 250);
         }
 
@@ -966,24 +963,16 @@ Reglas:
             document.getElementById('reminders-count').innerText = visibleReminders.length;
             
             if (visibleReminders.length === 0) {
-                list.innerHTML = `<p class="text-[12.5px] text-gray-500 text-center py-4">${selectedDayFilter ? `Sin pendientes para el ${selectedDayFilter}.` : 'No hay recordatorios pendientes.'}</p>`;
+                list.innerHTML = `<p class="col-span-2 text-[12.5px] text-gray-500 text-center py-4">${selectedDayFilter ? `Sin pendientes para el ${selectedDayFilter}.` : 'No hay recordatorios pendientes.'}</p>`;
                 return;
             }
 
-            list.innerHTML = visibleReminders.map((rem) => {
-                const realIdx = appData.reminders.indexOf(rem);
-                return `
-                    <div class="flex items-center justify-between dark-card px-3.5 py-3 rounded-2xl border border-gray-700/50 shadow-inner">
-                        <div class="flex items-center gap-2.5 flex-1 min-w-0 pr-2">
-                            <span class="w-2.5 h-2.5 rounded-full shrink-0 ${rem.priority === 'Alta' ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}"></span>
-                            <span class="text-white text-[12.5px] font-medium truncate" title="${esc(rem.text)}">${esc(rem.text)}</span>
-                        </div>
-                        <div class="flex items-center gap-1.5 shrink-0">
-                            <span class="text-[10px] text-gray-300 font-mono bg-gray-900 px-2 py-0.5 rounded-md border border-gray-800">${esc(remDayName(rem))}</span>
-                            <button onclick="deleteReminder(${realIdx})" title="Completar recordatorio" class="text-gray-500 hover:text-emerald-400 p-1"><i data-lucide="check-circle" class="w-4 h-4"></i></button>
-                        </div>
-                    </div>
-                `;
+            list.innerHTML = visibleReminders.map(rem => {
+                const i = appData.reminders.indexOf(rem);
+                return `<div class="dark-card rounded-2xl p-2.5 border ${rem.priority === 'Alta' ? 'border-red-500/30' : 'border-gray-700/50'} flex flex-col gap-1.5 min-w-0">
+                    <div class="flex items-center justify-between gap-1"><span class="text-[10px] font-mono text-gray-300 bg-gray-900 px-1.5 py-0.5 rounded-md border border-gray-800 truncate">${esc(remDayName(rem))}</span>
+                    <button onclick="deleteReminder(${i})" title="Completar" class="text-gray-500 hover:text-emerald-400 shrink-0"><i data-lucide="check-circle" class="w-4 h-4"></i></button></div>
+                    <p class="text-[11.5px] leading-snug text-white font-medium line-clamp-3" title="${esc(rem.text)}">${esc(rem.text)}</p></div>`;
             }).join('');
         }
 
@@ -997,6 +986,14 @@ Reglas:
         function renderProjects() {
             const container = document.getElementById('projects-container');
             container.innerHTML = '';
+            const cols = {};
+            COL_META_LIST.forEach(([k, label, color]) => {
+                if (currentFilter !== 'all' && currentFilter !== k) return;
+                const col = document.createElement('section'); col.className = 'kanban-col glass-panel rounded-3xl p-3';
+                col.innerHTML = `<div class="flex items-center justify-between px-2 pb-3"><span class="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-gray-300"><span class="w-2 h-2 rounded-full" style="background:${color}"></span>${label}</span><span class="text-[11px] text-gray-500 font-mono" data-count>0</span></div><div class="kanban-list space-y-3 min-h-[80px]" data-col="${k}"></div>`;
+                container.appendChild(col); cols[k] = col.querySelector('.kanban-list');
+            });
+            container.style.gridTemplateColumns = currentFilter === 'all' ? '' : 'minmax(0, 1fr)';
             const searchQuery = (document.getElementById('board-search')?.value || '').trim().toLowerCase();
             
             const filtered = appData.projects.filter(p => {
@@ -1028,7 +1025,7 @@ Reglas:
                 card.className = 'glass-panel rounded-3xl overflow-hidden project-card shadow-xl border border-gray-700/50 h-fit';
                 card.setAttribute('data-project-id', proj.id); card.style.setProperty('--st', { enfoque: '#34c759', cola: '#0a84ff', standby: '#8e8e93' }[proj.category] || '#34c759');
                 card.innerHTML = `
-                    <div class="px-4 py-4 bg-black/25">
+                    <div class="card-head px-4 py-4 bg-black/25 cursor-grab">
                         <div class="flex items-start justify-between gap-2">
                             <div class="flex items-start gap-2 flex-1 min-w-0">
                                 <button class="drag-handle cursor-grab active:cursor-grabbing text-gray-500 hover:text-white pt-1 shrink-0" title="Arrastrar para reordenar">
@@ -1040,7 +1037,7 @@ Reglas:
                                             <span class="w-2 h-2 rounded-full ${statusColor} shrink-0"></span>
                                             <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider truncate">${proj.status || 'Activo'}</span>
                                         </div>
-                                        <button onclick="event.stopPropagation(); changeProjectStatus('${proj.id}')" class="text-[10px] text-gray-400 hover:text-white bg-gray-900/90 border border-gray-700 px-2 py-0.5 rounded-md transition shrink-0">Estado</button>
+                                        <button onclick="event.stopPropagation(); changeProjectStatus('${proj.id}')" class="text-[10px] text-gray-400 hover:text-white bg-gray-900/90 border border-gray-700 px-2 py-0.5 rounded-md transition shrink-0" title="Mover a la siguiente columna">Mover ›</button>
                                     </div>
                                     <h2 class="text-[17px] font-bold text-white tracking-tight truncate">${esc(proj.name)}</h2>
                                     <p onclick="event.stopPropagation(); editProjectBrief('${proj.id}')" title="Clic para editar brief" class="text-[11.5px] text-gray-400 mt-1 line-clamp-2 hover:text-gray-200 transition cursor-pointer">${esc(proj.brief) || 'Añadir contexto o brief...'}</p>
@@ -1100,37 +1097,40 @@ Reglas:
                         </div>
                     </div>
                 `;
-                container.appendChild(card);
+                (cols[proj.category] || cols.enfoque || Object.values(cols)[0]).appendChild(card);
             });
 
+            Object.values(cols).forEach(l => { l.parentElement.querySelector("[data-count]").textContent = l.children.length; });
             initSortableCards();
         }
 
+        const COL_META_LIST = [['enfoque', 'Enfoque', '#34c759'], ['cola', 'En Cola', '#0a84ff'], ['standby', 'Standby', '#8e8e93']];
+        const COL_META = { enfoque: ['Enfoque', 'bg-emerald-500'], cola: ['En Cola', 'bg-blue-500'], standby: ['Standby', 'bg-gray-500'] };
+        let sortables = [];
         function initSortableCards() {
-            const container = document.getElementById('projects-container');
-            if (!container || typeof Sortable === 'undefined') return;
-            if (sortableInstance) sortableInstance.destroy();
-
-            sortableInstance = new Sortable(container, {
-                animation: 180,
-                handle: '.drag-handle',
-                ghostClass: 'sortable-ghost',
-                dragClass: 'sortable-drag',
-                onEnd: function () {
-                    const orderedIds = Array.from(container.querySelectorAll('[data-project-id]')).map(el => el.getAttribute('data-project-id'));
-                    const reordered = [];
-                    orderedIds.forEach(id => {
-                        const found = appData.projects.find(p => p.id === id);
-                        if (found) reordered.push(found);
-                    });
-                    appData.projects.forEach(p => {
-                        if (!reordered.some(r => r.id === p.id)) reordered.push(p);
-                    });
-                    appData.projects = reordered;
-                    saveData();
-                }
+            if (typeof Sortable === 'undefined') return;
+            sortables.forEach(x => x.destroy()); sortables = [];
+            document.querySelectorAll('.kanban-list').forEach(list => {
+                sortables.push(new Sortable(list, {
+                    group: 'kanban', animation: 180, handle: '.card-head', filter: 'button:not(.drag-handle), input', preventOnFilter: false,
+                    delay: 150, delayOnTouchOnly: true, touchStartThreshold: 6, ghostClass: 'sortable-ghost', dragClass: 'sortable-drag', fallbackOnBody: true,
+                    onEnd: () => {
+                        const order = [];
+                        document.querySelectorAll('.kanban-list').forEach(l => {
+                            const k = l.dataset.col;
+                            l.querySelectorAll('[data-project-id]').forEach(el => {
+                                const pr = appData.projects.find(x => x.id === el.dataset.projectId); if (!pr) return;
+                                if (pr.category !== k) { pr.category = k; pr.status = COL_META[k][0]; pr.statusColor = COL_META[k][1]; }
+                                order.push(pr);
+                            });
+                        });
+                        appData.projects.forEach(pr => { if (!order.includes(pr)) order.push(pr); });
+                        appData.projects = order; saveData();
+                    }
+                }));
             });
         }
+
 
         window.cycleTaskPriority = (projId, taskId) => {
             const proj = appData.projects.find(p => p.id === projId);
@@ -1221,14 +1221,10 @@ Reglas:
         };
 
         window.changeProjectStatus = function(projId) {
-            const proj = appData.projects.find(p => p.id === projId);
-            const opt = prompt(`Cambiar estado de "${proj.name}":
-1 = Enfoque
-2 = En Cola
-3 = Standby`);
-            if (opt === '1') { proj.category = 'enfoque'; proj.status = 'Enfoque'; proj.statusColor = 'bg-emerald-500'; }
-            else if (opt === '2') { proj.category = 'cola'; proj.status = 'En Cola'; proj.statusColor = 'bg-blue-500'; }
-            else if (opt === '3') { proj.category = 'standby'; proj.status = 'Standby'; proj.statusColor = 'bg-gray-500'; }
+            const proj = appData.projects.find(p => p.id === projId); if (!proj) return;
+            const order = ['enfoque', 'cola', 'standby'];
+            const k = order[(order.indexOf(proj.category) + 1) % 3];
+            proj.category = k; proj.status = COL_META[k][0]; proj.statusColor = COL_META[k][1];
             saveData();
         };
 
